@@ -32,7 +32,8 @@ Cloudflare credentials need to exist on anyone's laptop. See
 | Workflow | Trigger | Does |
 |---|---|---|
 | `ci.yml` | PRs and pushes touching `site/**` | `astro check` + build, then asserts the four pages and the signup form actually made it into `dist/client` |
-| `deploy.yml` | push to `main`, or manual | applies D1 migrations, deploys, then smoke-tests the live URL |
+| `deploy.yml` | push to `main`, or manual | deploys, then smoke-tests the live URL |
+| `migrate.yml` | manual only | applies `migrations/*.sql` to D1 and confirms the schema |
 | `sync-media.yml` | `assets/instagram/**` changes, or manual | uploads video to R2, skipping objects already present at the same size |
 
 **Two repository secrets are required**, under Settings → Secrets and
@@ -41,9 +42,22 @@ variables → Actions (the `production` environment):
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-Token scopes: **Workers Scripts: Edit**, **Workers R2 Storage: Edit**,
-**Workers KV Storage: Edit**, **D1: Edit** — plus **Zone → DNS: Edit** and
-**Zone → Workers Routes: Edit** if you bind `4estfilms.com`.
+Token scopes:
+
+| Scope | Needed by |
+|---|---|
+| Workers Scripts: Edit | `deploy.yml` |
+| Workers R2 Storage: Edit | `sync-media.yml` |
+| Workers KV Storage: Edit | the `SESSION` binding |
+| **D1: Edit** | `migrate.yml` **only** |
+| Zone → DNS: Edit + Workers Routes: Edit | binding `4estfilms.com` |
+
+`wrangler d1 execute --file` goes through Cloudflare's D1 *import* API, which
+needs **D1: Edit** specifically. Without it the call fails with
+`Authentication error [code: 10000]` even when the user behind the token is
+an account super admin — the error is about token scope, not account role.
+Deploys do not touch that API, so a token missing D1: Edit still ships the
+site; only `migrate.yml` will fail.
 
 The deploy job does not trust a green `wrangler deploy`: it then requests
 all four pages and posts a deliberately invalid address to `/api/notify`,

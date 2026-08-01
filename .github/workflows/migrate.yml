@@ -1,0 +1,65 @@
+name: Migrate D1
+
+# Schema changes are rare and deliberate, so they are not coupled to the
+# deploy. Running them here means a routine site deploy cannot be blocked by
+# a database operation, and the deploy token does not need D1 write access.
+#
+# `wrangler d1 execute --file` uses Cloudflare's D1 *import* API, which
+# requires the token to carry **D1: Edit**. A token without it fails with
+# "Authentication error [code: 10000]" even when the user behind it is an
+# account super admin — the error is about token scope, not account role.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which database to migrate'
+        type: choice
+        options: [remote, local]
+        default: remote
+
+concurrency:
+  group: migrate-d1
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    defaults:
+      run:
+        working-directory: site
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      # Every statement is CREATE ... IF NOT EXISTS, so re-running is safe.
+      - name: Apply
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0001_subscribers.sql
+
+      - name: Confirm schema
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='subscribers'"
