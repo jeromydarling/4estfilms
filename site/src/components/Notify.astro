@@ -58,6 +58,12 @@ const {
 </section>
 
 <script>
+  import { capture } from '../lib/attribution';
+
+  // Runs on arrival, not at submit: the tagged page is usually not the page
+  // where somebody eventually signs up.
+  const attr = capture();
+
   for (const form of document.querySelectorAll<HTMLFormElement>('form.form')) {
     const msg = form.querySelector<HTMLParagraphElement>('.form__msg')!;
     const btn = form.querySelector<HTMLButtonElement>('button')!;
@@ -73,7 +79,7 @@ const {
         const res = await fetch('/api/notify', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(Object.fromEntries(data)),
+          body: JSON.stringify({ ...Object.fromEntries(data), ...attr }),
         });
         const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 

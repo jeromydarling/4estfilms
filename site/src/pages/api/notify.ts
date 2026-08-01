@@ -21,6 +21,7 @@ export const POST: APIRoute = async ({ request }) => {
   let film = '';
   let firstName = '';
   let honeypot = '';
+  let attr: Record<string, unknown> = {};
 
   const ct = request.headers.get('content-type') ?? '';
   try {
@@ -30,16 +31,25 @@ export const POST: APIRoute = async ({ request }) => {
       film = String(b.film ?? '');
       firstName = String(b.first_name ?? '');
       honeypot = String(b.hp_url ?? '');
+      attr = b;
     } else {
       const f = await request.formData();
       email = String(f.get('email') ?? '');
       film = String(f.get('film') ?? '');
       firstName = String(f.get('first_name') ?? '');
       honeypot = String(f.get('hp_url') ?? '');
+      attr = Object.fromEntries(f);
     }
   } catch {
     return json({ ok: false, error: 'bad request' }, 400);
   }
+
+  // Attribution is caller-supplied and therefore untrusted — capped and
+  // stored as-is, never interpreted. It is a label on a row, not a decision.
+  const tag = (k: string, max = 80) => {
+    const v = attr[k];
+    return typeof v === 'string' && v ? v.slice(0, max) : null;
+  };
 
   // Bots fill every field they find; humans never see this one.
   if (honeypot.trim() !== '') return json({ ok: true });
@@ -56,8 +66,10 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     await db
       .prepare(
-        `INSERT INTO subscribers (email, first_name, source, film, ip_country, user_agent)
-         VALUES (?1, ?2, 'site', ?3, ?4, ?5)
+        `INSERT INTO subscribers
+           (email, first_name, source, film, ip_country, user_agent,
+            utm_source, utm_medium, utm_campaign, utm_content, referrer, landing_path)
+         VALUES (?1, ?2, 'site', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
          ON CONFLICT(email) DO NOTHING`
       )
       .bind(
@@ -65,7 +77,13 @@ export const POST: APIRoute = async ({ request }) => {
         firstName || null,
         film.slice(0, 60) || null,
         request.headers.get('cf-ipcountry'),
-        (request.headers.get('user-agent') ?? '').slice(0, 255)
+        (request.headers.get('user-agent') ?? '').slice(0, 255),
+        tag('utm_source'),
+        tag('utm_medium'),
+        tag('utm_campaign'),
+        tag('utm_content'),
+        tag('referrer', 200),
+        tag('landing_path', 120)
       )
       .run();
   } catch (err) {
