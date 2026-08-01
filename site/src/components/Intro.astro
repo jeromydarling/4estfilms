@@ -1,0 +1,131 @@
+---
+// The identity sting, played once as the page opens, then dissolved into the
+// hero — which lands on the same mark the sting finishes assembling.
+---
+
+{/*
+  Armed inline, before the hero paints, so the overlay never flashes in after
+  the page is already visible. Anything that should skip the intro — a repeat
+  view this session, reduced-motion, no JS — simply leaves it unarmed and the
+  hero shows immediately.
+*/}
+<script is:inline>
+  (function () {
+    try {
+      if (sessionStorage.getItem('4est.intro') === 'seen') return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      document.documentElement.dataset.intro = 'armed';
+    } catch { /* private mode: just skip the intro */ }
+  })();
+</script>
+
+<div class="intro" data-intro-root hidden>
+  <video
+    class="intro__video"
+    muted
+    playsinline
+    autoplay
+    preload="auto"
+    poster="/brand/sting-end.webp"
+    aria-hidden="true"
+  >
+    <source src="/brand/sting.webm" type="video/webm" />
+    <source src="/brand/sting.mp4" type="video/mp4" />
+  </video>
+
+  <button class="intro__skip" type="button">Skip intro</button>
+</div>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-intro-root]');
+  const armed = document.documentElement.dataset.intro === 'armed';
+
+  if (root) {
+    const video = root.querySelector<HTMLVideoElement>('.intro__video')!;
+    const skip = root.querySelector<HTMLButtonElement>('.intro__skip')!;
+
+    if (!armed) {
+      root.remove();
+    } else {
+      root.hidden = false;
+      document.documentElement.dataset.introPlaying = 'true';
+
+      let done = false;
+      const end = () => {
+        if (done) return;
+        done = true;
+        try { sessionStorage.setItem('4est.intro', 'seen'); } catch {}
+        root.dataset.over = 'true';
+        delete document.documentElement.dataset.introPlaying;
+        // let the dissolve finish before the node leaves the tree
+        setTimeout(() => root.remove(), 1200);
+      };
+
+      video.addEventListener('ended', end);
+      skip.addEventListener('click', end);
+      // Esc should always get you out of a full-screen takeover
+      addEventListener('keydown', (e) => { if (e.key === 'Escape') end(); });
+      // A stalled or undecodable file must not hold the page hostage
+      video.addEventListener('error', end);
+      const guard = setTimeout(end, 7000);
+      video.addEventListener('ended', () => clearTimeout(guard));
+
+      // Autoplay is permitted while muted, but if a policy still refuses,
+      // drop straight through rather than showing a frozen frame.
+      const p = video.play();
+      if (p) p.catch(end);
+    }
+  }
+</script>
+
+<style>
+  .intro {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: grid;
+    place-items: center;
+    background: #000;
+    transition: opacity 1s var(--ease);
+  }
+  .intro[data-over='true'] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .intro__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* source is 738×414, so it is upscaled on desktop — the sting is a
+       videotape treatment and reads as intentional, but a higher-resolution
+       master would be better if one exists */
+    image-rendering: auto;
+  }
+
+  .intro__skip {
+    position: absolute;
+    right: var(--pad);
+    bottom: clamp(1.5rem, 4vw, 3rem);
+    background: transparent;
+    border: 1px solid rgba(242, 237, 227, .3);
+    color: var(--bone);
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    padding: .7rem 1.2rem;
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity .4s var(--ease), border-color .4s var(--ease);
+  }
+  .intro__skip:hover,
+  .intro__skip:focus-visible { opacity: 1; border-color: var(--blood-lift); }
+</style>
+
+<style is:global>
+  /* Hold the hero's own entrance until the sting clears, so the mark arrives
+     once rather than twice. */
+  html[data-intro-playing] .hero__mark img { animation-play-state: paused; }
+  html[data-intro-playing] { overflow: hidden; }
+</style>
