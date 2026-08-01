@@ -1,9 +1,6 @@
+/// <reference path="../worker-configuration.d.ts" />
+
+// The adapter exposes bindings here; Astro 7 removed Astro.locals.runtime.env.
 declare module 'cloudflare:workers' {
   export const env: Env;
-}
-
-interface Env {
-  DB: D1Database;
-  MEDIA: R2Bucket;
-  SESSION: KVNamespace;
 }
