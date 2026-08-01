@@ -90,10 +90,24 @@ export const hnim = {
   logline:
     'The only priest in Nevada battles demons and outlaws for the soul of a boy with no name.',
   question: 'What is your name?',
-  eras: [
-    { year: '1867', note: 'Virginia City, Nevada — after the bonanza that made it the most important industrial city between Denver and San Francisco.' },
-    { year: '1890', note: 'A schoolroom, a barn, and a presence that should not be there.' },
-  ],
+  // A frame narrative: the film opens in 1890 and the bulk of it is the
+  // story being told inside that frame. Order matters — 1890 comes first.
+  narrative: {
+    frame: {
+      year: '1890',
+      place: 'An orphanage in Virginia City',
+      role: 'The telling',
+      text: 'Sunday evening. Sister Maria, newly arrived to the Daughters of Charity, has started a tradition of telling the orphans in her care a story, accompanied on an old piano by the groundskeeper who tends the sisters’ land.',
+      quote: 'Today I will tell you the story of a boy, a priest and a demon.',
+      quoteBy: 'Sr. Maria',
+    },
+    tale: {
+      year: '1867',
+      place: 'Virginia City, Nevada',
+      role: 'The story she tells',
+      text: 'The boom town the bonanza had made the most important industrial city between Denver and San Francisco — and in the whole state of Nevada, one priest. The film does not cut away and come back; it moves between the schoolroom and the story all the way through.',
+    },
+  },
   premise:
     'Loosely based on Father Patrick Manogue — the only priest in the state of Nevada, who earned a reputation as “Wyatt Earp with a collar.” Feared by disreputable men, loved by everyone he helped.',
   origin:

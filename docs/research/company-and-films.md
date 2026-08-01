@@ -191,11 +191,24 @@ like/comment counts, and local filenames.
 
 ### Settled (confirmed by the team, 2026-08-01)
 
-1. **The film takes place in BOTH time periods — 1867 and 1890.** The
-   apparent conflict between the old site's "circa 1867" and the IG bio's
-   "1890" was not an error; the story spans both. Copy should say so
-   rather than picking one, and the two eras are a genuine design device:
-   the site can carry two distinct period palettes.
+1. **It is a frame narrative, not two parallel eras.** Confirmed against
+   the screenplay (Jeromy Darling, 66pp). The film opens at an orphanage
+   in Virginia City: Sr. Maria, newly arrived to the Daughters of Charity,
+   has begun a Sunday tradition of telling the orphans a story, with the
+   groundskeeper accompanying on an old piano. She announces *"Today I will
+   tell you the story of a boy, a priest and a demon"* — and the rest is
+   that story, set in 1867. The script intercuts between schoolroom and
+   story continuously rather than switching once.
+
+   **⚠️ The frame year needs confirming.** The team said 1890, but the
+   script's own dialogue puts it at 1897: Sr. Maria says Manogue died
+   "just 2 years ago on February 27, 1895." Either the draft moved or 1890
+   is from memory. The site currently says 1890 — one value in
+   `site.ts`.
+
+   **⚠️ Do not put the ending on the site.** The final scene reveals the
+   groundskeeper is Michael grown, via the scarring on his back. It is the
+   film's last image and the site deliberately withholds it.
 2. **Release: Winter 2026.** Not 2024 (stale) and not just "2026." The
    @4estfilms bio should be updated to match. This is a near-term release
    — the site is launch collateral, not a placeholder.

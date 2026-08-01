@@ -12,7 +12,7 @@ export const prerender = true;
 <Base
   world="frontier"
   title="His Name is Michael — a western musical from 4est Films"
-  description="The only priest in Nevada battles demons and outlaws for the soul of a boy with no name. An original western musical set across 1867 and 1890 in Virginia City. Releasing Winter 2026."
+  description="The only priest in Nevada battles demons and outlaws for the soul of a boy with no name. An original western musical: a nun in 1890 tells the children in her care the story of Father Manogue, Virginia City, 1867. Releasing Winter 2026."
 >
   <!-- ── hero ── -->
   <section class="hero">
@@ -38,17 +38,28 @@ export const prerender = true;
     caption="His Name is Michael — official trailer. Cinematography by Aaron Berger."
   />
 
-  <!-- ── the two eras ── -->
+  <!-- ── frame narrative: the telling, then the tale ── -->
   <section class="section wrap">
-    <p class="eyebrow" data-reveal>The film moves between two years</p>
-    <div class="eras">
-      {hnim.eras.map((e, i) => (
-        <article class="era" data-reveal style={`--delay:${i * 160}ms`}>
-          <p class="era__year">{e.year}</p>
-          <p class="dim">{e.note}</p>
-        </article>
-      ))}
-    </div>
+    <p class="eyebrow" data-reveal>A story inside a story</p>
+
+    <article class="era era--frame" data-reveal>
+      <p class="era__role">{hnim.narrative.frame.role}</p>
+      <p class="era__year">{hnim.narrative.frame.year}</p>
+      <p class="era__place">{hnim.narrative.frame.place}</p>
+      <p class="dim era__note">{hnim.narrative.frame.text}</p>
+      <blockquote class="era__quote">
+        <p>“{hnim.narrative.frame.quote}”</p>
+        <cite>{hnim.narrative.frame.quoteBy}</cite>
+      </blockquote>
+    </article>
+
+    <!-- inset, because everything past this point is inside her telling -->
+    <article class="era era--tale" data-reveal style="--delay:180ms">
+      <p class="era__role">{hnim.narrative.tale.role}</p>
+      <p class="era__year">{hnim.narrative.tale.year}</p>
+      <p class="era__place">{hnim.narrative.tale.place}</p>
+      <p class="dim era__note">{hnim.narrative.tale.text}</p>
+    </article>
   </section>
 
   <!-- ── premise ── -->
@@ -68,7 +79,7 @@ export const prerender = true;
   <section class="section wrap">
     <p class="eyebrow" data-reveal>Key credits</p>
     <dl class="credits">
-      {hnim.key.map(([role, who], i) => (
+      {hnim.key.filter(([, who]) => who).map(([role, who], i) => (
         <div class="credits__row" data-reveal style={`--delay:${i * 45}ms`}>
           <dt>{role}</dt>
           <dd>{who}</dd>
@@ -186,20 +197,73 @@ export const prerender = true;
     color: var(--accent);
   }
 
-  .eras {
-    display: grid;
-    gap: clamp(2rem, 6vw, 5rem);
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    margin-top: 2rem;
+  .era {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.6rem;
+    margin-top: 2.5rem;
+    max-width: 46ch;
   }
-  .era { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+  /* the tale sits inside the frame — indented, with a rule running down the
+     margin to show it is being spoken rather than shown directly */
+  .era--tale {
+    margin-left: clamp(1.25rem, 8vw, 7rem);
+    border-top-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    position: relative;
+  }
+  .era--tale::before {
+    content: '';
+    position: absolute;
+    left: clamp(-1rem, -4vw, -3rem);
+    top: -1px;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent) 45%, transparent),
+      transparent
+    );
+  }
+  .era__role {
+    font-size: .7rem;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: var(--bone-faint);
+    margin: 0 0 1rem;
+  }
+  .era--tale .era__role { color: var(--accent); }
   .era__year {
     font-family: var(--display);
     font-size: clamp(3.5rem, 9vw, 6.5rem);
     line-height: .9;
-    margin: 0 0 1rem;
+    margin: 0;
     color: var(--accent);
     font-variation-settings: 'WONK' 1, 'opsz' 144;
+  }
+  .era__place {
+    font-family: var(--display);
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    margin: .6rem 0 1rem;
+  }
+  .era__note { font-size: .95rem; }
+  .era__quote {
+    margin: 1.6rem 0 0;
+    padding-left: 1.2rem;
+    border-left: 2px solid var(--accent);
+  }
+  .era__quote p {
+    font-family: var(--display);
+    font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+    line-height: 1.25;
+    margin: 0;
+  }
+  .era__quote cite {
+    display: block;
+    margin-top: .7rem;
+    font-style: normal;
+    font-size: .7rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--bone-faint);
   }
 
   .premise {
