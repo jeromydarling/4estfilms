@@ -24,7 +24,7 @@ export const strung = {
   producers: ['Joseph Bezenek', 'Alexander C. Shields', 'Molly Worre'],
   cast: [
     ['Jeromy Darling', 'Eric'],
-    ['Wyatt Darling', 'The Boy'],
+    ['Wyatt Darling', 'Wilder'],
     ['Seth Pioske', ''],
     ['Geoff George', ''],
     ['Joseph Bezenek', ''],
@@ -90,14 +90,16 @@ export const hnim = {
   logline:
     'The only priest in Nevada battles demons and outlaws for the soul of a boy with no name.',
   question: 'What is your name?',
-  // A frame narrative: the film opens in 1890 and the bulk of it is the
-  // story being told inside that frame. Order matters — 1890 comes first.
+  // A frame narrative: the film opens in 1897 and the bulk of it is the
+  // story being told inside that frame. Order matters — 1897 comes first.
+  // The year is fixed by Sr. Maria's own narration, which places the frame
+  // two years after Manogue's death on 27 February 1895.
   narrative: {
     frame: {
-      year: '1890',
+      year: '1897',
       place: 'An orphanage in Virginia City',
       role: 'The telling',
-      text: 'Sunday evening. Sister Maria, newly arrived to the Daughters of Charity, has started a tradition of telling the orphans in her care a story, accompanied on an old piano by the groundskeeper who tends the sisters’ land.',
+      text: 'Sunday evening. Sister Maria gathers the orphans in her care, and the groundskeeper takes his place at the old piano.',
       quote: 'Today I will tell you the story of a boy, a priest and a demon.',
       quoteBy: 'Sr. Maria',
     },
@@ -105,7 +107,7 @@ export const hnim = {
       year: '1867',
       place: 'Virginia City, Nevada',
       role: 'The story she tells',
-      text: 'The boom town the bonanza had made the most important industrial city between Denver and San Francisco — and in the whole state of Nevada, one priest. The film does not cut away and come back; it moves between the schoolroom and the story all the way through.',
+      text: 'Thirty years earlier, in the boom town silver had made the most important city between Denver and San Francisco — and in the whole state of Nevada, one priest.',
     },
   },
   premise:
@@ -138,7 +140,7 @@ export const hnim = {
     {
       title: 'The schoolroom',
       plates: ["day7_BAT06197.webp", "day7_DSC04509.webp", "day7_DSC04556.webp"],
-      text: 'Twenty child actors in a period-accurate 1890 classroom, reciting verse. The production built the sequence around them, and it became the warmest passage in a film that spends much of its time in the dark.',
+      text: 'Twenty child actors in a period-accurate schoolroom, reciting verse. The production built the sequence around them, and it became the warmest passage in a film that spends much of its time in the dark.',
     },
     {
       title: 'The barn',
