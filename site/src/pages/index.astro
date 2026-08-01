@@ -4,6 +4,7 @@ import { company, strung, hnim, people } from '../data/site';
 import gallery from '../data/hnim-gallery.json';
 import Notify from '../components/Notify.astro';
 import Trailer from '../components/Trailer.astro';
+import Intro from '../components/Intro.astro';
 
 // A slow montage behind the title — one frame from each shoot day.
 const montage = [
@@ -19,6 +20,8 @@ export const prerender = true;
   title="4est Films — Minneapolis film company"
   description="4est Films is a Minneapolis film company. Home of the 12-time award-winning short Strung and the upcoming western musical His Name is Michael, releasing Winter 2026."
 >
+  <Intro />
+
   <!-- ── hero ─────────────────────────────────────────────── -->
   <section class="hero">
     <div class="hero__plates" aria-hidden="true">
