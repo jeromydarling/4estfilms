@@ -1,0 +1,282 @@
+---
+import Base from '../../layouts/Base.astro';
+import { hnim } from '../../data/site';
+import gallery from '../../data/hnim-gallery.json';
+import Notify from '../../components/Notify.astro';
+
+const byDay: Record<string, typeof gallery> = {};
+for (const g of gallery) (byDay[g.day] ??= []).push(g);
+const hero = 'key/hero-prayer.webp';
+export const prerender = true;
+---
+
+<Base
+  world="frontier"
+  title="His Name is Michael — a western musical from 4est Films"
+  description="The only priest in Nevada battles demons and outlaws for the soul of a boy with no name. An original western musical set across 1867 and 1890 in Virginia City. Releasing Winter 2026."
+>
+  <!-- ── hero ── -->
+  <section class="hero">
+    <div class="hero__art" data-parallax="0.06">
+      <img src={`/stills/${hero}`} alt="" loading="eager" decoding="async" />
+    </div>
+    <div class="hero__scrim" aria-hidden="true"></div>
+
+    <div class="wrap hero__body">
+      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.genre}</p>
+      <h1 class="display hero__title" data-reveal style="--delay:80ms">
+        His Name<br />is Michael
+      </h1>
+      <p class="lede" data-reveal style="--delay:240ms">{hnim.logline}</p>
+      <p class="hero__release" data-reveal style="--delay:360ms">{hnim.release}</p>
+    </div>
+  </section>
+
+  <!-- ── the two eras ── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>The film moves between two years</p>
+    <div class="eras">
+      {hnim.eras.map((e, i) => (
+        <article class="era" data-reveal style={`--delay:${i * 160}ms`}>
+          <p class="era__year">{e.year}</p>
+          <p class="dim">{e.note}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── premise ── -->
+  <section class="section wrap premise">
+    <div class="prose">
+      <p class="eyebrow" data-reveal>Wyatt Earp with a collar</p>
+      <p class="lede" data-reveal>{hnim.premise}</p>
+      <p class="dim" data-reveal style="--delay:120ms">{hnim.origin}</p>
+    </div>
+    <blockquote class="question" data-reveal style="--delay:200ms">
+      <p>The film seeks to answer a question:</p>
+      <p class="question__q">{hnim.question}</p>
+    </blockquote>
+  </section>
+
+  <!-- ── credits ── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>Key credits</p>
+    <dl class="credits">
+      {hnim.key.map(([role, who], i) => (
+        <div class="credits__row" data-reveal style={`--delay:${i * 45}ms`}>
+          <dt>{role}</dt>
+          <dd>{who}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <!-- ── nine days ── -->
+  <section class="section diary">
+    <div class="wrap">
+      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.shootNote}</p>
+      <h2 class="h2" data-reveal>Nine days</h2>
+      <p class="dim diary__intro" data-reveal style="--delay:120ms">
+        The company posted from set every day of the shoot. This is what they wrote.
+      </p>
+    </div>
+
+    <ol class="diary__list">
+      {hnim.diary.map((d) => {
+        const shots = byDay[`Day ${d.day}`] ?? [];
+        return (
+          <li class="day" data-reveal>
+            <div class="wrap day__inner">
+              <div class="day__text">
+                <p class="day__num">Day {String(d.day).padStart(2, '0')}</p>
+                <h3 class="h3">{d.title}</h3>
+                <p class="dim">{d.text}</p>
+              </div>
+              <div class="day__shots">
+                {shots.slice(0, 3).map((s) => (
+                  <img
+                    src={`/stills/hnim/${s.file}`}
+                    alt={`His Name is Michael — day ${d.day} production still`}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ))}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  </section>
+
+  <!-- ── gallery ── -->
+  <section class="section">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>From the set</p>
+      <h2 class="h2" data-reveal>Virginia City, November</h2>
+    </div>
+    <div class="grid">
+      {gallery.map((g, i) => (
+        <figure class="grid__cell" data-reveal style={`--delay:${(i % 6) * 60}ms`}>
+          <img
+            src={`/stills/hnim/${g.file}`}
+            alt={`His Name is Michael — ${g.day} production still`}
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+      ))}
+    </div>
+    <p class="wrap dim credit">Stills by Ryan McBoyle.</p>
+  </section>
+
+  <Notify
+    film="his-name-is-michael"
+    heading="Know when it opens."
+    note="His Name is Michael arrives Winter 2026. One email when there is a date, a trailer, or a screening near you."
+  />
+
+  <!-- ── close ── -->
+  <section class="section wrap close">
+    <h2 class="h2" data-reveal>{hnim.release}</h2>
+    <p class="lede" data-reveal style="--delay:120ms">
+      Follow the film as it comes.
+    </p>
+    <a href={hnim.instagram} class="link" data-reveal style="--delay:200ms">
+      @hnimfilm <span aria-hidden="true">→</span>
+    </a>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    align-content: end;
+    padding-bottom: clamp(3rem, 9vw, 7rem);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero__art { position: absolute; inset: -10% 0; z-index: -2; }
+  .hero__art img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: translateY(var(--shift, 0)) scale(1.08);
+    filter: brightness(.5) sepia(.25) saturate(1.1);
+  }
+  .hero__scrim {
+    position: absolute; inset: 0; z-index: -1;
+    background:
+      linear-gradient(to bottom, rgba(11,17,24,.55), rgba(11,17,24,.2) 40%, var(--night) 96%),
+      radial-gradient(80% 60% at 20% 90%, rgba(217,164,65,.14), transparent 70%);
+  }
+  .hero__title { margin-bottom: 2rem; }
+  .hero__release {
+    margin-top: 2.4rem;
+    font-size: .75rem;
+    letter-spacing: .34em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .eras {
+    display: grid;
+    gap: clamp(2rem, 6vw, 5rem);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    margin-top: 2rem;
+  }
+  .era { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+  .era__year {
+    font-family: var(--display);
+    font-size: clamp(3.5rem, 9vw, 6.5rem);
+    line-height: .9;
+    margin: 0 0 1rem;
+    color: var(--accent);
+    font-variation-settings: 'WONK' 1, 'opsz' 144;
+  }
+
+  .premise {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+    align-items: start;
+  }
+  .premise .lede { max-width: 34ch; margin-bottom: 1.6rem; }
+  .question {
+    margin: 0;
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2.4rem);
+  }
+  .question p { font-size: .85rem; letter-spacing: .16em; text-transform: uppercase; color: var(--bone-faint); margin: 0; }
+  .question__q {
+    font-family: var(--display) !important;
+    font-size: clamp(2rem, 5vw, 3.4rem) !important;
+    line-height: 1.05;
+    letter-spacing: -.02em !important;
+    text-transform: none !important;
+    color: var(--bone) !important;
+    margin-top: 1rem !important;
+  }
+  @media (max-width: 860px) { .premise { grid-template-columns: 1fr; } }
+
+  .credits { margin: 2rem 0 0; }
+  .credits__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .credits dt { font-size: .74rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bone-faint); }
+  .credits dd { margin: 0; font-family: var(--display); font-size: clamp(1.05rem, 2vw, 1.4rem); }
+
+  .diary__intro { margin-top: 1.4rem; max-width: 40ch; }
+  .diary__list { list-style: none; margin: clamp(3rem, 7vw, 5rem) 0 0; padding: 0; counter-reset: d; }
+  .day { border-top: 1px solid var(--rule); padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+  .day__inner {
+    display: grid;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+    align-items: center;
+  }
+  .day__num {
+    font-size: .72rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 .9rem;
+  }
+  .day__text .dim { margin-top: 1rem; font-size: .95rem; }
+  .day__shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+  .day__shots img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    width: 100%;
+    filter: brightness(.82) saturate(.9);
+    transition: filter .6s var(--ease), transform .6s var(--ease);
+  }
+  .day__shots img:hover { filter: none; transform: scale(1.03); }
+  @media (max-width: 860px) { .day__inner { grid-template-columns: 1fr; } }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+    gap: .5rem;
+    margin-top: 2.5rem;
+    padding-inline: .5rem;
+  }
+  .grid__cell { margin: 0; overflow: hidden; }
+  .grid__cell img {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    filter: brightness(.8);
+    transition: filter .6s var(--ease), transform .8s var(--ease);
+  }
+  .grid__cell:hover img { filter: none; transform: scale(1.05); }
+  .credit { margin-top: 1.5rem; font-size: .8rem; }
+
+  .close { text-align: center; }
+  .close .lede { margin: 1.5rem auto 2.5rem; }
+</style>

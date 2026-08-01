@@ -1,0 +1,99 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Optional palette override, e.g. 'forest' | 'frontier' */
+  world?: 'forest' | 'frontier';
+}
+const { title, description, world } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en" data-world={world}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="4est Films" />
+    <meta name="theme-color" content="#08080a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+
+  <body>
+    <!-- Grain is generated inline so it costs no request and cannot fail to load. -->
+    <div
+      class="grain"
+      aria-hidden="true"
+      style="--grain-url: url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22220%22 height=%22220%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.55%22/%3E%3C/svg%3E')"
+    ></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <a href="#main" class="sr">Skip to content</a>
+    <Nav />
+    <main id="main"><slot /></main>
+    <Footer />
+
+    <script>
+      // Reveal on scroll. Anything with [data-reveal] fades up once.
+      const els = document.querySelectorAll('[data-reveal]');
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (e.isIntersecting) {
+                e.target.classList.add('is-in');
+                io.unobserve(e.target);
+              }
+            }
+          },
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.08 }
+        );
+        els.forEach((el) => io.observe(el));
+      } else {
+        els.forEach((el) => el.classList.add('is-in'));
+      }
+
+      // Parallax: elements with [data-parallax] drift against the scroll.
+      const px = [...document.querySelectorAll<HTMLElement>('[data-parallax]')];
+      if (px.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        let ticking = false;
+        const frame = () => {
+          const vh = window.innerHeight;
+          for (const el of px) {
+            const r = el.getBoundingClientRect();
+            if (r.bottom < -200 || r.top > vh + 200) continue;
+            const depth = Number(el.dataset.parallax) || 0.12;
+            const mid = r.top + r.height / 2 - vh / 2;
+            el.style.setProperty('--shift', `${(-mid * depth).toFixed(2)}px`);
+          }
+          ticking = false;
+        };
+        addEventListener(
+          'scroll',
+          () => {
+            if (!ticking) { ticking = true; requestAnimationFrame(frame); }
+          },
+          { passive: true }
+        );
+        frame();
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  html[data-world='forest'] { --accent: var(--moss); background: var(--forest-deep); }
+  html[data-world='forest'] body { background: var(--forest-deep); }
+  html[data-world='frontier'] { --accent: var(--lantern); background: var(--night); }
+  html[data-world='frontier'] body { background: var(--night); }
+</style>

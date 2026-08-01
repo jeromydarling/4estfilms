@@ -1,0 +1,89 @@
+name: Deploy Worker
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+# Never let two deploys race to the same Worker.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & deploy to Cloudflare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    defaults:
+      run:
+        working-directory: site
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Idempotent — every statement is CREATE ... IF NOT EXISTS, so this is
+      # safe to re-run on every deploy.
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: d1 execute 4estfilms-db --remote --file migrations/0001_subscribers.sql
+
+      - name: Deploy
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy
+
+      # Deploying is not the same as working. Hit the live Worker and prove
+      # the pages render and the signup endpoint validates.
+      - name: Smoke test the deployment
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          [ -n "${URL:-}" ] || { echo "::warning::no deployment URL returned, skipping smoke test"; exit 0; }
+          echo "testing $URL"
+
+          for path in / /films/his-name-is-michael/ /films/strung/ /about/; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 4 \
+                     --retry-all-errors "$URL$path")
+            [ "$code" = "200" ] || { echo "::error::$path returned $code"; exit 1; }
+            echo "  $path $code"
+          done
+
+          # A bad address must be rejected — proves D1 is bound and the
+          # route is executing rather than being served as a static 404.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$URL/api/notify" \
+                   -H 'content-type: application/json' -d '{"email":"not-an-email"}')
+          [ "$code" = "422" ] || { echo "::error::/api/notify returned $code, expected 422"; exit 1; }
+          echo "  /api/notify validation 422"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Worker deploy"
+            echo
+            echo "- URL: ${{ steps.deploy.outputs.deployment-url }}"
+            echo "- Commit: \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

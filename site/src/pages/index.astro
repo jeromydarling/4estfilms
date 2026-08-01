@@ -1,0 +1,273 @@
+---
+import Base from '../layouts/Base.astro';
+import { company, strung, hnim, people } from '../data/site';
+import gallery from '../data/hnim-gallery.json';
+import Notify from '../components/Notify.astro';
+
+// A slow montage behind the title — one frame from each shoot day.
+const montage = [
+  'key/schoolroom.webp', 'key/hero-prayer.webp', 'key/nun-piano.webp',
+  'key/candles.webp', 'key/reading.webp', 'key/hat-drama.webp',
+  'key/portrait-woman.webp', 'key/two-men.webp', 'key/piano-boy.webp',
+].map((file) => ({ file }));
+const title = 'Four est Films';
+export const prerender = true;
+---
+
+<Base
+  title="4est Films — Minneapolis film company"
+  description="4est Films is a Minneapolis film company. Home of the 12-time award-winning short Strung and the upcoming western musical His Name is Michael, releasing Winter 2026."
+>
+  <!-- ── hero ─────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero__plates" aria-hidden="true">
+      {montage.map((m, i) => (
+        <img
+          src={`/stills/${m.file}`}
+          alt=""
+          loading={i === 0 ? 'eager' : 'lazy'}
+          decoding="async"
+          style={`--i:${i}; --n:${montage.length}`}
+        />
+      ))}
+    </div>
+    <div class="hero__scrim" aria-hidden="true"></div>
+
+    <div class="wrap hero__body">
+      <p class="eyebrow" data-reveal>{company.base} · Est. {company.since}</p>
+      <h1 class="display rise">
+        <span class="sr">4est Films</span>
+        <span aria-hidden="true">
+          {[...'4est'].map((c, i) => <span style={`--i:${i}`}>{c}</span>)}
+        </span>
+        <span class="hero__films" aria-hidden="true">
+          {[...'Films'].map((c, i) => <span style={`--i:${i + 5}`}>{c}</span>)}
+        </span>
+      </h1>
+      <p class="lede hero__lede" data-reveal style="--delay:600ms">
+        {company.tagline}.
+      </p>
+    </div>
+
+    <div class="hero__foot wrap">
+      <span class="dim">Scroll</span>
+      <span class="hero__line" aria-hidden="true"></span>
+    </div>
+  </section>
+
+  <!-- ── the two films ────────────────────────────────────── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>Two films</p>
+    <h2 class="h2" data-reveal>
+      One begins in a forest.<br />The other, on a frontier.
+    </h2>
+  </section>
+
+  <!-- HNIM -->
+  <a href="/films/his-name-is-michael/" class="feature feature--frontier">
+    <div class="feature__art" data-parallax="0.09">
+      <img
+        src="/stills/key/schoolroom-wide.webp"
+        alt="A still from His Name is Michael"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+    <div class="feature__body wrap">
+      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.release} · {hnim.genre}</p>
+      <h2 class="h2 feature__title" data-reveal>{hnim.title}</h2>
+      <p class="lede" data-reveal style="--delay:120ms">{hnim.logline}</p>
+      <span class="link" data-reveal style="--delay:220ms">Enter Virginia City <span aria-hidden="true">→</span></span>
+    </div>
+  </a>
+
+  <!-- Strung -->
+  <a href="/films/strung/" class="feature feature--forest">
+    <div class="feature__art" data-parallax="0.09">
+      <img
+        src="/stills/strung/2020-12-17_CI4q_yUgNeX_01.jpg"
+        alt="A still from Strung"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+    <div class="feature__body wrap">
+      <p class="eyebrow eyebrow--accent" data-reveal>{strung.year} · {strung.totalWins} awards</p>
+      <h2 class="h2 feature__title" data-reveal>{strung.title}</h2>
+      <p class="lede" data-reveal style="--delay:120ms">
+        Lost in the forest of his own mind.
+      </p>
+      <span class="link" data-reveal style="--delay:220ms">Into the forest <span aria-hidden="true">→</span></span>
+    </div>
+  </a>
+
+  <!-- ── the record ───────────────────────────────────────── -->
+  <section class="section wrap record">
+    <div>
+      <p class="eyebrow" data-reveal>The record</p>
+      <h2 class="h2" data-reveal>
+        {strung.totalWins} wins.<br />{strung.festivalCount} festivals.
+      </h2>
+      <p class="dim record__note" data-reveal style="--delay:150ms">
+        For a first film, made by first-time directors, with more than thirty
+        people who showed up out of love.
+      </p>
+    </div>
+    <ul class="record__list">
+      {strung.awards.map(([fest, prize, yr], i) => (
+        <li class="laurel" data-reveal style={`--delay:${i * 55}ms`}>
+          <span class="laurel__leaf" aria-hidden="true">❧</span>
+          <span class="laurel__name">{fest}</span>
+          <span class="laurel__prize">{prize} · {yr}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- ── the people ───────────────────────────────────────── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>Who makes them</p>
+    <div class="people">
+      {people.map((p, i) => (
+        <article data-reveal style={`--delay:${i * 110}ms`}>
+          <h3 class="h3">{p.name}</h3>
+          <p class="eyebrow people__role">{p.roles}</p>
+          <p class="dim">{p.bio}</p>
+        </article>
+      ))}
+    </div>
+    <p class="people__more" data-reveal>
+      <a href="/about/" class="link">More about the company <span aria-hidden="true">→</span></a>
+    </p>
+  </section>
+  <Notify
+    film="company"
+    heading="Know what comes next."
+  />
+</Base>
+
+<style>
+  /* ── hero ── */
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    align-content: center;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero__plates { position: absolute; inset: 0; z-index: -2; }
+  .hero__plates img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    filter: grayscale(.55) contrast(1.15) brightness(.62);
+    animation: plate calc(var(--n) * 4.2s) steps(1, end) infinite;
+    animation-delay: calc(var(--i) * 4.2s);
+  }
+  @keyframes plate {
+    0%, 11% { opacity: .95; }
+    12%, 100% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero__plates img { animation: none; }
+    .hero__plates img:first-child { opacity: .9; }
+  }
+  .hero__scrim {
+    position: absolute; inset: 0; z-index: -1;
+    background:
+      linear-gradient(to bottom, rgba(8,8,10,.72) 0%, rgba(8,8,10,.35) 45%, var(--ink) 100%);
+  }
+  .hero__body { position: relative; }
+  .display .hero__films {
+    display: block;
+    font-size: .3em;
+    letter-spacing: .34em;
+    text-transform: uppercase;
+    font-family: var(--sans);
+    font-weight: 400;
+    margin-top: 1.4rem;
+    opacity: .72;
+  }
+  .hero__lede { margin-top: 2.5rem; }
+  .hero__foot {
+    position: absolute;
+    inset: auto 0 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: .7rem;
+    letter-spacing: .24em;
+    text-transform: uppercase;
+  }
+  .hero__line {
+    height: 1px;
+    width: min(22vw, 180px);
+    background: linear-gradient(to right, var(--bone-faint), transparent);
+    transform-origin: left;
+    animation: pull 2.6s var(--ease) infinite;
+  }
+  @keyframes pull { 0%,100% { transform: scaleX(.4); } 50% { transform: scaleX(1); } }
+
+  /* ── feature blocks ── */
+  .feature {
+    position: relative;
+    display: grid;
+    align-content: center;
+    min-height: clamp(30rem, 82vh, 54rem);
+    text-decoration: none;
+    color: var(--bone);
+    overflow: hidden;
+    isolation: isolate;
+    border-block: 1px solid var(--rule);
+  }
+  .feature__art { position: absolute; inset: -12% 0; z-index: -2; }
+  .feature__art img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: translateY(var(--shift, 0)) scale(1.06);
+    filter: grayscale(.35) brightness(.5);
+    transition: filter .9s var(--ease), transform .9s var(--ease);
+  }
+  .feature:hover .feature__art img { filter: grayscale(0) brightness(.62); }
+  .feature::before {
+    content: '';
+    position: absolute; inset: 0; z-index: -1;
+  }
+  .feature--frontier::before {
+    background: linear-gradient(100deg, rgba(11,17,24,.94) 8%, rgba(27,42,61,.55) 55%, transparent 100%);
+  }
+  .feature--frontier { --accent: var(--lantern); }
+  .feature--forest::before {
+    background: linear-gradient(100deg, rgba(13,23,18,.94) 8%, rgba(29,52,39,.55) 55%, transparent 100%);
+  }
+  .feature--forest { --accent: var(--moss); }
+  .feature__body { max-width: 1500px; }
+  .feature__title { margin-bottom: 1.4rem; }
+  .feature .link { margin-top: 2.4rem; }
+
+  /* ── record ── */
+  .record {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+  .record__note { margin-top: 1.6rem; max-width: 34ch; }
+  .record__list { list-style: none; margin: 0; padding: 0; }
+  @media (max-width: 860px) { .record { grid-template-columns: 1fr; } }
+
+  /* ── people ── */
+  .people {
+    display: grid;
+    gap: clamp(2rem, 4vw, 3.5rem);
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    margin-top: 2rem;
+  }
+  .people__role { margin: .7rem 0 1rem; }
+  .people p { font-size: .95rem; }
+  .people__more { margin-top: 3.5rem; }
+</style>

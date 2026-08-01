@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+
+# Instagram video stays tracked: it is already in git history, so ignoring
+# it saves nothing on clone, and CI needs it on disk to sync into R2.
+# It never reaches the Worker bundle — that only ships site/dist/client.

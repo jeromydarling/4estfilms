@@ -1,0 +1,81 @@
+---
+import { company, strung } from '../data/site';
+const year = new Date().getFullYear();
+---
+
+<footer class="foot">
+  <hr class="rule" />
+  <div class="wrap foot__grid">
+    <div>
+      <p class="foot__mark">4est Films</p>
+      <p class="dim foot__small">{company.tagline}</p>
+      <p class="dim foot__small">{company.base}</p>
+    </div>
+
+    <div>
+      <p class="eyebrow">Films</p>
+      <ul>
+        <li><a href="/films/his-name-is-michael/">His Name is Michael</a></li>
+        <li><a href="/films/strung/">Strung</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <p class="eyebrow">Elsewhere</p>
+      <ul>
+        <li><a href={company.instagram}>Instagram</a></li>
+        <li><a href={strung.imdb}>Strung on IMDb</a></li>
+      </ul>
+    </div>
+
+    <div class="foot__help">
+      <p class="eyebrow eyebrow--accent">If you need it</p>
+      <p class="foot__num"><a href={strung.helpline.href}>{strung.helpline.number}</a></p>
+      <p class="dim foot__small">{strung.helpline.label}. You are seen, heard, and loved.</p>
+    </div>
+  </div>
+
+  <div class="wrap foot__base">
+    <p class="dim foot__small">© {year} {company.legal}</p>
+    <p class="dim foot__small">Stills by Ryan McBoyle &amp; Forrest Wasko</p>
+  </div>
+</footer>
+
+<style>
+  .foot { padding-top: clamp(3rem, 8vw, 6rem); }
+  .foot__grid {
+    display: grid;
+    gap: 2.5rem clamp(1.5rem, 4vw, 4rem);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  }
+  .foot__mark {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    margin: 0 0 .6rem;
+  }
+  .foot__small { font-size: .82rem; margin: .2rem 0; max-width: 30ch; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { margin-bottom: .5rem; }
+  li a {
+    text-decoration: none;
+    font-size: .88rem;
+    color: var(--bone-dim);
+    transition: color .4s var(--ease);
+  }
+  li a:hover { color: var(--accent); }
+  .foot__help { border-left: 1px solid var(--rule); padding-left: 1.5rem; }
+  .foot__num { font-family: var(--display); font-size: 1.5rem; margin: 0 0 .4rem; }
+  .foot__num a { text-decoration: none; color: var(--accent); }
+  .foot__base {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    border-top: 1px solid var(--rule);
+    padding-block: 1.5rem 2.5rem;
+  }
+  @media (max-width: 640px) {
+    .foot__help { border-left: 0; padding-left: 0; }
+  }
+</style>
