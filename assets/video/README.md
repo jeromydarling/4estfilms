@@ -30,3 +30,5 @@ lives in Drive. Re-encode from it if a new cut lands.
 The player picks a variant in script rather than with `<source media>`,
 which browsers do not honour reliably inside `<video>` — Chromium chose the
 720p file on a 1440px viewport during testing.
+
+<!-- variants last verified against production 2026-08-01 -->

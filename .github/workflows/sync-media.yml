@@ -64,7 +64,18 @@ jobs:
             # Added/copied/modified/renamed — never deleted.
             git diff --name-only --diff-filter=ACMR HEAD^ HEAD -- \
               assets/instagram assets/video | media > files.txt
-            echo "reason=changed since ${GITHUB_SHA:0:7}^" >> "$GITHUB_OUTPUT"
+
+            # assets/video holds a handful of encodes that must stay in step
+            # with each other; a player asking for a variant that was never
+            # uploaded is worse than re-sending a few files. So any change
+            # under it re-syncs the whole directory. assets/instagram is ~70
+            # files and stays strictly diff-based.
+            if git diff --name-only HEAD^ HEAD -- assets/video | grep -q .; then
+              git ls-files 'assets/video/**' | media >> files.txt
+            fi
+
+            sort -u files.txt -o files.txt
+            echo "reason=changed since ${GITHUB_SHA:0:7}^ (video dir swept)" >> "$GITHUB_OUTPUT"
           fi
 
           count=$(wc -l < files.txt)
