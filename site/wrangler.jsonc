@@ -33,6 +33,20 @@
     }
   ],
 
+  // Cloudflare Email Service. No destination restriction — this sends to
+  // subscribers, not to us — but the sender is pinned, so a bug cannot make
+  // the Worker send as an address we do not own.
+  //
+  // `wrangler dev` simulates this: nothing leaves the machine and the
+  // message bodies are written to files it names in the log. Add
+  // "remote": true only when you intend to send real mail from a laptop.
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["hello@4estfilms.studio"]
+    }
+  ],
+
   // Custom domains, so the Worker answers on the apex and on www. Both
   // require 4estfilms.studio to be an active zone on this account; a custom
   // domain also provisions the certificate and the DNS record itself.
