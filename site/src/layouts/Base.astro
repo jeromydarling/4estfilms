@@ -8,9 +8,27 @@ interface Props {
   description: string;
   /** Optional palette override, e.g. 'forest' | 'frontier' */
   world?: 'forest' | 'frontier';
+  /** Share card under /og/. Regenerate with `npm run og` at the repo root. */
+  ogImage?: string;
+  /** What the card shows, for anyone who cannot see it. */
+  ogImageAlt?: string;
+  /** schema.org JSON-LD for this page. */
+  schema?: Record<string, unknown> | Record<string, unknown>[];
 }
-const { title, description, world } = Astro.props;
+const {
+  title,
+  description,
+  world,
+  ogImage = '/og/home.jpg',
+  ogImageAlt = '4est Films',
+  schema,
+} = Astro.props;
+
 const canonical = new URL(Astro.url.pathname, Astro.site);
+// Scrapers require an absolute og:image — a root-relative path is silently
+// dropped by most of them, which is indistinguishable from having none.
+const ogUrl = new URL(ogImage, Astro.site);
+const ld = schema ? (Array.isArray(schema) ? schema : [schema]) : [];
 ---
 
 <!doctype html>
@@ -25,8 +43,22 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="4est Films" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content={ogUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogUrl} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
     <meta name="theme-color" content="#08080a" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {ld.map((s) => (
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(s)} />
+    ))}
 
     {/*
       The scroll reveal hides everything it touches until an observer says

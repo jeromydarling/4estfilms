@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { hnim } from '../../data/site';
+import { hnimSchema } from '../../data/schema';
 import Notify from '../../components/Notify.astro';
 import Trailer from '../../components/Trailer.astro';
 
@@ -12,6 +13,9 @@ export const prerender = true;
   world="frontier"
   title="His Name is Michael — a supernatural Western musical from 4est Films"
   description={`${hnim.description} In 1897 a nun tells the orphans in her care the story of Father Manogue, Virginia City, 1867. ${hnim.release}.`}
+  ogImage="/og/hnim.jpg"
+  ogImageAlt="His Name is Michael — coming late 2026"
+  schema={hnimSchema}
 >
   <!-- ── hero ── -->
   <section class="hero">
