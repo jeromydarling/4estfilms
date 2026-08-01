@@ -182,20 +182,113 @@ Bezenek as "Bez and Reid" in the film's own statement.
 
 ---
 
+---
+
+## Instagram — full archive captured
+
+All 79 posts across the three accounts, with media, are in
+`assets/instagram/` (239 files, 59 MB — 232 images at 1080×1350, 7 videos).
+`assets/instagram/manifest.json` maps every post to its caption, permalink,
+like/comment counts, and local filenames.
+
+| Account | Name | Followers | Posts | Bio |
+|---|---|---|---|---|
+| [@4estfilms](https://instagram.com/4estfilms) | 4est Films 🥀 | 334 | 37 | "Creating and collaborating with love since 2015 \| 🎞️ Full-Length Feature @hnimfilm Coming 2026 \| Follow our award-winning movie @strungfilm🍿" |
+| [@strungfilm](https://instagram.com/strungfilm) | STRUNG | 209 | 26 | "{Lost in the forest of his own mind}" |
+| [@hnimfilm](https://instagram.com/hnimfilm) | His Name Is Michael \| Film | 168 | 16 | "1890 Western Movie Musical \| The only priest in Nevada battles demons & outlaws for the soul of a boy with no name. 🔜 @4estfilms" |
+
+### ⚠️ Two conflicts to resolve before writing copy
+
+1. **1890 or 1867?** The IG bio says "1890 Western Movie Musical" and a
+   set report describes "a historically kept **1890** classroom." The old
+   hisnameismichael.live copy said "Virginia City, Nevada, **circa 1867**."
+   Pick one.
+2. **Release year.** A Dec 2023 post says "Coming to theatres 2024." The
+   current @4estfilms bio says "Coming 2026." 2026 is presumably right —
+   and it is now August 2026, so this is imminent. Confirm the date.
+
+### *Strung* — the real synopsis and credits
+
+> Lost in the forest of his own mind, **Eric** must rely on the survival
+> skills of an enigmatic nine-year-old boy to help him battle vicious
+> withdrawals and self-deprivation to catalyze change within his family's
+> cycle of addiction.
+
+Use this as the logline — it is the film's own words and much stronger
+than the directors' statement for a hero slot. The protagonist is named
+**Eric**, played by Jeromy Darling; the nine-year-old is **Wyatt Darling**,
+his real son, in his first-ever film role.
+
+Crew surfaced from captions: DP **Alexander C. Shields**; AD **Molly
+Worre**; steadicam **Travis Higgins** (@tmhigginsdp); stills **Forrest
+Wasko**; additional photography **Julian McPherson**.
+
+### *Strung* — awards, with the human detail
+
+- **Jeromy Darling won the ONLY acting award at the Munich Film Awards**,
+  out of **4,000+ submissions**. That is the single best line on the site.
+- Jeromy also took "Best Performance of Fest" and "Best Actor in a Drama"
+  at Actors Awards LA.
+- **Wyatt Darling (age 9) won Best Child Actor *and* Best Supporting
+  Actor** at Actors Awards LA — the latter beating adult performances in
+  feature films. Plus Best Young Actor at LA Film Awards, Gold Award for
+  Best Child Actor at Independent Shorts, and Best Young Actor of the Year
+  at Top Shorts. Four acting awards in one month, in his first film.
+- **Best First Time Director** at Top Shorts for Bezenek + Reid.
+- Best of Fest at MSPIFF in its 40th year.
+
+### *Strung* — the premiere, and why it matters
+
+July 2021, the historic 1920s **Sioux Falls State Theatre**. Two nights,
+red carpet, Q&A with stars, directors and producers. Tickets were free
+with a donation — and the premiere **raised nearly $15,000** for
+[Emily's Hope](https://emilyshope.charity/) and **Tallgrass Recovery &
+Sober Living Homes**, to help people who cannot afford addiction
+treatment. Sponsors: Avera McKennan Hospital, First Premier Bank &
+Premier Bank Card.
+
+This is the story the site should tell about *Strung* — not just that it
+won things, but that the team turned it into money for treatment. Pair it
+with the SAMHSA helpline.
+
+A **feature-length version of *Strung* is in development** (per Emily's
+Hope, 2021).
+
+### *His Name is Michael* — production record
+
+Shot over **9 days in November 2023** (wrapped Nov 24, 2023), directed by
+Joseph Bezenek (@bezzbunny), DP **Aaron Berger** (@aaronjberger). 4est
+Films' feature-film production debut. **The story began life on stage the
+prior year and was so well received it had to be turned into a movie.**
+
+The @hnimfilm feed is a day-by-day production diary — 131 images of a
+9-day shoot. This is the richest visual material available and would carry
+a "making of" section on its own. Highlights: Day 1 shot only 40% of
+schedule but captured the film's opening; Day 3 fought wind, nearby
+drilling and an out-of-tune piano; Day 4 "the most difficult to date — and
+the most rewarding"; Day 6 went from children in an 1890 classroom to a
+demonic presence in a barn, and the director cried on set for the first
+time; Day 7 brought 20 child actors; Day 9 was a skeleton crew shooting
+guerrilla-style by the Missouri River with a horse named "Hollywood."
+
+Bezenek also appears on screen as **The King of Virginia City**. Other
+characters named: Sister Mary Catherine, Gregory. Young actor **Zelalem**
+wrapped on Day 5.
+
+The tone throughout is explicitly prayerful — "by the grace of God,"
+"send a prayer for us." Consistent with the faith thread noted above.
+
+---
+
 ## Gaps
 
-- **Instagram (@4estfilms, @strungfilm, @hnimfilm) was not read.** All
-  three return Instagram's login wall. Agent Reach routes Instagram
-  through OpenCLI, a Chrome extension that talks to a binary on the *same
-  machine* — this session runs in a remote container, so it cannot reach a
-  local browser. There is no server-side path. To use IG content
-  (post copy, stills, follower counts, recent activity), someone has to
-  supply it manually or run the tooling locally.
 - **www.4estfilms.com refuses connections** from this container and from
   Jina's crawler (`ERR_CONNECTION_REFUSED` / connection reset). All
   4estfilms.com content above came from Exa's index, so it may be stale.
   Worth a manual check of what is currently live.
 - **`hisnameismichael.live` does not resolve.** Content is from a 2022
   cached copy.
-- No trailer, still, or poster assets were retrieved — none reachable
-  without the IG accounts or a working 4estfilms.com.
+- **No trailer or final poster.** The IG archive has stills, teaser
+  posters and BTS, but no finished trailer or key art for either film.
+- **Instagram media URLs expire**, which is why the files are committed
+  rather than hot-linked. Re-pull with the scripts if anything is missing.
