@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { company, people } from '../data/site';
+import { organization } from '../data/schema';
 import Notify from '../components/Notify.astro';
 // Placeholder until a photograph of Joseph and Jeromy together arrives —
 // this is the pair of them in frame, which is the closest we hold.
@@ -11,6 +12,9 @@ export const prerender = true;
 <Base
   title="About — 4est Films"
   description="4est Films is an independent production company founded by filmmaker Joseph Bezenek in 2015, developing emotionally ambitious films alongside the artists who believe in them."
+  ogImage="/og/about.jpg"
+  ogImageAlt="Films made with conviction. Created through collaboration."
+  schema={organization}
 >
   <section class="top wrap">
     <p class="eyebrow" data-reveal>{company.line}</p>

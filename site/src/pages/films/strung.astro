@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { strung } from '../../data/site';
+import { strungSchema } from '../../data/schema';
 import Notify from '../../components/Notify.astro';
 import YouTube from '../../components/YouTube.astro';
 
@@ -18,6 +19,9 @@ export const prerender = true;
   world="forest"
   title="Strung (2019) — 12-time award-winning short film from 4est Films"
   description="Lost in the forest of his own mind, Eric must rely on a nine-year-old boy to battle withdrawal and break his family's cycle of addiction. Twelve wins across eight festivals."
+  ogImage="/og/strung.jpg"
+  ogImageAlt="Strung — 2019, 12 awards across 8 festivals"
+  schema={strungSchema}
 >
   <!-- ── hero ── -->
   <section class="hero">
