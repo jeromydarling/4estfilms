@@ -1,0 +1,188 @@
+---
+interface Props {
+  /** Base path of the encoded variants, without resolution or extension. */
+  src?: string;
+  poster: string;
+  label?: string;
+  caption?: string;
+}
+const {
+  src = '/media/video/hnim-trailer',
+  poster,
+  label = 'Watch the trailer',
+  caption,
+} = Astro.props;
+---
+
+<section class="trailer" data-src={src}>
+  <div class="trailer__frame">
+    <!--
+      No <source> children: the `media` attribute is not honoured reliably
+      inside <video> (Chromium picked the 720p file on a 1440px viewport),
+      so the variant is chosen in script instead. preload="none" keeps the
+      2-minute file off the wire until someone asks for it.
+    -->
+    <video
+      class="trailer__video"
+      poster={poster}
+      preload="none"
+      playsinline
+      aria-label={label}></video>
+
+    <button class="trailer__play" type="button" aria-label={label}>
+      <span class="trailer__disc" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </span>
+      <span class="trailer__label">{label}</span>
+    </button>
+
+    <div class="trailer__bars" aria-hidden="true"></div>
+    <p class="trailer__error" role="alert" hidden>
+      This trailer can’t play in your browser.
+      <a class="trailer__dl" download>Download it instead.</a>
+    </p>
+  </div>
+  {caption && <p class="wrap dim trailer__caption">{caption}</p>}
+</section>
+
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>('.trailer')) {
+    const video = root.querySelector<HTMLVideoElement>('.trailer__video')!;
+    const play = root.querySelector<HTMLButtonElement>('.trailer__play')!;
+    const err = root.querySelector<HTMLParagraphElement>('.trailer__error')!;
+    const dl = root.querySelector<HTMLAnchorElement>('.trailer__dl')!;
+    const base = root.dataset.src!;
+
+    // Prefer VP9 where it is supported — smaller at equal quality. Safari
+    // gets H.264. Resolution follows the viewport, not a media query.
+    const pickSource = () => {
+      const wide = Math.max(window.innerWidth, window.innerHeight) >= 900;
+      const canWebm = video.canPlayType('video/webm; codecs="vp9"') !== '';
+      if (canWebm && wide) return `${base}-1080.webm`;
+      return wide ? `${base}-1080.mp4` : `${base}-720.mp4`;
+    };
+
+    const fail = () => {
+      root.dataset.playing = '';
+      video.controls = false;
+      dl.href = `${base}-720.mp4`;
+      err.hidden = false;
+    };
+
+    const start = async () => {
+      if (!video.src) video.src = pickSource();
+      root.dataset.playing = 'true';
+      video.controls = true;
+      try {
+        await video.play();
+      } catch {
+        // Autoplay policy can still refuse; controls are up, so the viewer
+        // can start it. Not an error state.
+        root.dataset.playing = 'true';
+      }
+    };
+
+    play.addEventListener('click', start);
+    video.addEventListener('error', fail);
+
+    video.addEventListener('ended', () => {
+      root.dataset.playing = '';
+      video.controls = false;
+      video.currentTime = 0;
+    });
+  }
+</script>
+
+<style>
+  .trailer { position: relative; }
+
+  .trailer__frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .trailer__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* the frame's edge falls away once playback starts */
+  .trailer__bars {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 clamp(3rem, 10vw, 9rem) rgba(0, 0, 0, .75);
+    transition: opacity .8s var(--ease);
+  }
+  .trailer[data-playing='true'] .trailer__bars { opacity: 0; }
+
+  .trailer__play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 1.4rem;
+    width: 100%;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--bone);
+    transition: opacity .5s var(--ease);
+  }
+  .trailer[data-playing='true'] .trailer__play {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .trailer__disc {
+    display: grid;
+    place-content: center;
+    width: clamp(4.5rem, 8vw, 6.5rem);
+    aspect-ratio: 1;
+    border: 1px solid rgba(242, 237, 227, .5);
+    border-radius: 50%;
+    padding-left: .18em; /* optically centre the triangle */
+    backdrop-filter: blur(3px);
+    background: rgba(8, 8, 10, .25);
+    transition: background .5s var(--ease), border-color .5s var(--ease),
+      transform .5s var(--ease);
+  }
+  .trailer__play:hover .trailer__disc,
+  .trailer__play:focus-visible .trailer__disc {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ink);
+    transform: scale(1.06);
+  }
+
+  .trailer__label {
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 20px rgba(0, 0, 0, .8);
+  }
+
+  .trailer__error {
+    position: absolute;
+    inset: auto 0 2rem;
+    text-align: center;
+    font-size: .85rem;
+    color: var(--bone-dim);
+    margin: 0;
+  }
+  .trailer__dl { color: var(--accent); }
+
+  .trailer__caption {
+    margin-top: 1.2rem;
+    font-size: .8rem;
+  }
+</style>

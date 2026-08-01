@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import { company, strung, hnim, people } from '../data/site';
 import gallery from '../data/hnim-gallery.json';
 import Notify from '../components/Notify.astro';
+import Trailer from '../components/Trailer.astro';
 
 // A slow montage behind the title — one frame from each shoot day.
 const montage = [
@@ -80,6 +81,11 @@ export const prerender = true;
       <span class="link" data-reveal style="--delay:220ms">Enter Virginia City <span aria-hidden="true">→</span></span>
     </div>
   </a>
+
+  <Trailer
+    poster="/stills/key/trailer-poster.webp"
+    label="Watch the trailer"
+  />
 
   <!-- Strung -->
   <a href="/films/strung/" class="feature feature--forest">
