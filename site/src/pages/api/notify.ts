@@ -19,6 +19,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   let email = '';
   let film = '';
+  let firstName = '';
   let honeypot = '';
 
   const ct = request.headers.get('content-type') ?? '';
@@ -27,12 +28,14 @@ export const POST: APIRoute = async ({ request }) => {
       const b = (await request.json()) as Record<string, unknown>;
       email = String(b.email ?? '');
       film = String(b.film ?? '');
-      honeypot = String(b.company ?? '');
+      firstName = String(b.first_name ?? '');
+      honeypot = String(b.hp_url ?? '');
     } else {
       const f = await request.formData();
       email = String(f.get('email') ?? '');
       film = String(f.get('film') ?? '');
-      honeypot = String(f.get('company') ?? '');
+      firstName = String(f.get('first_name') ?? '');
+      honeypot = String(f.get('hp_url') ?? '');
     }
   } catch {
     return json({ ok: false, error: 'bad request' }, 400);
@@ -46,15 +49,20 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: false, error: 'Please check that address.' }, 422);
   }
 
+  // Optional, so a bad value must never cost someone their subscription —
+  // it is trimmed and capped rather than validated and rejected.
+  firstName = firstName.trim().slice(0, 80);
+
   try {
     await db
       .prepare(
-        `INSERT INTO subscribers (email, source, film, ip_country, user_agent)
-         VALUES (?1, 'site', ?2, ?3, ?4)
+        `INSERT INTO subscribers (email, first_name, source, film, ip_country, user_agent)
+         VALUES (?1, ?2, 'site', ?3, ?4, ?5)
          ON CONFLICT(email) DO NOTHING`
       )
       .bind(
         email,
+        firstName || null,
         film.slice(0, 60) || null,
         request.headers.get('cf-ipcountry'),
         (request.headers.get('user-agent') ?? '').slice(0, 255)

@@ -96,8 +96,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
   /* Oxblood stays the accent everywhere — it is the house colour. What
      changes per film is the ground it sits on, and a secondary tint used
      for scrims and washes. */
-  html[data-world='forest'] { --tint: var(--moss); background: var(--forest-deep); }
-  html[data-world='forest'] body { background: var(--forest-deep); }
-  html[data-world='frontier'] { --tint: var(--lantern); background: var(--night); }
-  html[data-world='frontier'] body { background: var(--night); }
+  html { --ground: var(--ink); }
+  html[data-world='forest'] { --tint: var(--moss); --ground: var(--forest-deep); }
+  html[data-world='frontier'] { --tint: var(--lantern); --ground: var(--night); }
+  html, html body { background: var(--ground); }
 </style>

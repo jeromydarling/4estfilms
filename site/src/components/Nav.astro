@@ -7,7 +7,6 @@ const links = [
   ['/films/strung/', 'Strung', 'Strung'],
   ['/about/', 'About', 'About'],
 ];
-const isHome = path === '/';
 ---
 
 <header class="nav">
@@ -19,8 +18,19 @@ const isHome = path === '/';
     <ul>
       {links.map(([href, label, short]) => (
         <li>
-          <a href={href} aria-current={path === href ? 'page' : undefined}>
-            <span class="full">{label}</span>
+          {/*
+            The name comes from aria-label, not the spans. Both spans are
+            hidden from assistive tech because which one is *visible* depends
+            on the breakpoint: without this, wide screens announced the label
+            twice and narrow screens announced nothing at all, since the only
+            visible text was the hidden one.
+          */}
+          <a
+            href={href}
+            aria-label={label}
+            aria-current={path === href ? 'page' : undefined}
+          >
+            <span class="full" aria-hidden="true">{label}</span>
             <span class="short" aria-hidden="true">{short}</span>
           </a>
         </li>

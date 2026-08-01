@@ -21,15 +21,28 @@ const {
 
     <form class="form" method="POST" action="/api/notify" data-reveal style="--delay:180ms">
       <input type="hidden" name="film" value={film} />
-      <!-- honeypot: hidden from people, irresistible to bots -->
+      {/*
+        Honeypot. Named so it reads as nothing to a person who does surface
+        it — a password manager or form scanner was picking up the previous
+        "Company" label and offering to fill it.
+      */}
       <div class="hp" aria-hidden="true">
-        <label>Company<input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+        <input type="text" name="hp_url" tabindex="-1" autocomplete="off" />
       </div>
 
-      <label class="sr" for="notify-email">Email address</label>
       <div class="form__row">
+        <label class="sr" for={`notify-name-${film || 'x'}`}>First name (optional)</label>
         <input
-          id="notify-email"
+          id={`notify-name-${film || 'x'}`}
+          class="form__name"
+          type="text"
+          name="first_name"
+          autocomplete="given-name"
+          placeholder="First name"
+        />
+        <label class="sr" for={`notify-email-${film || 'x'}`}>Email address</label>
+        <input
+          id={`notify-email-${film || 'x'}`}
           type="email"
           name="email"
           required
@@ -96,8 +109,10 @@ const {
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
   .form__row { display: flex; gap: .6rem; flex-wrap: wrap; }
-  input[type='email'] {
-    flex: 1 1 16rem;
+  input[type='email'] { flex: 3 1 15rem; }
+  /* wide enough that the placeholder is never clipped at the display size */
+  .form__name { flex: 1 1 11rem; }
+  input[type='email'], .form__name {
     background: transparent;
     border: 0;
     border-bottom: 1px solid var(--rule);
@@ -106,9 +121,10 @@ const {
     font-size: clamp(1.1rem, 2vw, 1.5rem);
     padding: .7rem .2rem;
     transition: border-color .4s var(--ease);
+    min-width: 0;
   }
-  input[type='email']::placeholder { color: var(--bone-faint); }
-  input[type='email']:focus { outline: 0; border-color: var(--accent); }
+  input::placeholder { color: var(--bone-faint); }
+  input:focus { outline: 0; border-color: var(--blood-lift); }
 
   button {
     background: transparent;

@@ -1,0 +1,137 @@
+---
+interface Props {
+  /** Video ID or any YouTube watch/share URL. */
+  id: string;
+  title: string;
+  /** Facade image. Falls back to YouTube's own thumbnail. */
+  poster?: string;
+  caption?: string;
+  label?: string;
+}
+const { id, title, poster, caption, label = 'Watch the trailer' } = Astro.props;
+
+// Accept an ID or any of the URL shapes people paste.
+const videoId =
+  id.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{6,})/)?.[1] ?? id;
+
+// Nothing loads from youtube.com until the viewer presses play: the poster is
+// ours, and the iframe is only inserted on click. That keeps third-party
+// cookies and ~1MB of player JS off a page nobody asked to watch a video on.
+const src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+const fallback = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+const watch = `https://www.youtube.com/watch?v=${videoId}`;
+---
+
+<section class="yt" data-src={src}>
+  <div class="yt__frame">
+    <img class="yt__poster" src={poster ?? fallback} alt="" loading="lazy" decoding="async" />
+    <button class="yt__play" type="button" aria-label={`${label} — ${title}`}>
+      <span class="yt__disc" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </span>
+      <span class="yt__label">{label}</span>
+    </button>
+  </div>
+  <div class="wrap yt__under">
+    {caption && <p class="dim yt__caption">{caption}</p>}
+    <a class="link yt__out" href={watch} target="_blank" rel="noopener">
+      Watch on YouTube <span aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>('.yt')) {
+    const play = root.querySelector<HTMLButtonElement>('.yt__play')!;
+    const frame = root.querySelector<HTMLElement>('.yt__frame')!;
+
+    play.addEventListener(
+      'click',
+      () => {
+        const iframe = document.createElement('iframe');
+        iframe.src = root.dataset.src!;
+        iframe.title = play.getAttribute('aria-label')!;
+        iframe.allow =
+          'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+        iframe.allowFullscreen = true;
+        iframe.className = 'yt__iframe';
+        frame.replaceChildren(iframe);
+        iframe.focus();
+      },
+      { once: true }
+    );
+  }
+</script>
+
+<style>
+  .yt__frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .yt__poster,
+  .yt__frame :global(.yt__iframe) {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    object-fit: cover;
+  }
+  .yt__poster { filter: brightness(.8); }
+
+  .yt__play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 1.4rem;
+    width: 100%;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--bone);
+  }
+  .yt__disc {
+    display: grid;
+    place-content: center;
+    width: clamp(4.5rem, 8vw, 6.5rem);
+    aspect-ratio: 1;
+    border: 1px solid rgba(242, 237, 227, .5);
+    border-radius: 50%;
+    padding-left: .18em;
+    backdrop-filter: blur(3px);
+    background: rgba(8, 8, 10, .25);
+    transition: background .5s var(--ease), border-color .5s var(--ease),
+      transform .5s var(--ease);
+  }
+  .yt__play:hover .yt__disc,
+  .yt__play:focus-visible .yt__disc {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ink);
+    transform: scale(1.06);
+  }
+  .yt__label {
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 20px rgba(0, 0, 0, .8);
+  }
+
+  .yt__under {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    margin-top: 1.2rem;
+  }
+  .yt__caption { font-size: .8rem; margin: 0; }
+  .yt__out { flex: none; }
+</style>

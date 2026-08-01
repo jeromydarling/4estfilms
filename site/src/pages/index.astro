@@ -1,7 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
 import { company, strung, hnim, people } from '../data/site';
-import gallery from '../data/hnim-gallery.json';
 import Notify from '../components/Notify.astro';
 import Trailer from '../components/Trailer.astro';
 import Intro from '../components/Intro.astro';
@@ -12,13 +11,12 @@ const montage = [
   'key/candles.webp', 'key/reading.webp', 'key/hat-drama.webp',
   'key/portrait-woman.webp', 'key/two-men.webp', 'key/piano-boy.webp',
 ].map((file) => ({ file }));
-const title = 'Four est Films';
 export const prerender = true;
 ---
 
 <Base
-  title="4est Films — Minneapolis film company"
-  description="4est Films is a Minneapolis film company. Home of the 12-time award-winning short Strung and the upcoming western musical His Name is Michael, releasing Winter 2026."
+  title={company.seoTitle}
+  description="4est Films is an independent film production company. Home of the 12-time award-winning short Strung and His Name is Michael, a supernatural Western musical coming late 2026."
 >
   <Intro />
 
@@ -38,7 +36,7 @@ export const prerender = true;
     <div class="hero__scrim" aria-hidden="true"></div>
 
     <div class="wrap hero__body">
-      <p class="timecode hero__tc" data-reveal>REC · {company.base} · EST {company.since}</p>
+      <p class="timecode hero__tc" data-reveal>REC · {company.line}</p>
       <h1 class="hero__mark">
         <span class="sr">4est Films</span>
         <img
@@ -89,6 +87,7 @@ export const prerender = true;
   <Trailer
     poster="/stills/key/trailer-poster.webp"
     label="Watch the trailer"
+    youtube={hnim.youtube}
   />
 
   <!-- Strung -->
@@ -119,16 +118,16 @@ export const prerender = true;
         {strung.totalWins} wins.<br />{strung.festivalCount} festivals.
       </h2>
       <p class="dim record__note" data-reveal style="--delay:150ms">
-        Recognised across eight international festivals, including Best in
-        Fest and a jury prize.
+        Recognized across eight international festivals, including Best in
+        Fest and two Best First-Time Director honors.
       </p>
     </div>
     <ul class="record__list">
-      {strung.awards.map(([fest, prize, yr], i) => (
+      {strung.featuredAwards.map(([prize, fest], i) => (
         <li class="laurel" data-reveal style={`--delay:${i * 55}ms`}>
           <span class="laurel__leaf" aria-hidden="true">❧</span>
-          <span class="laurel__name">{fest}</span>
-          <span class="laurel__prize">{prize} · {yr}</span>
+          <span class="laurel__name">{prize}</span>
+          <span class="laurel__prize">{fest}</span>
         </li>
       ))}
     </ul>

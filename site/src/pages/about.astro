@@ -1,21 +1,25 @@
 ---
 import Base from '../layouts/Base.astro';
-import { company, people, strung, hnim } from '../data/site';
-import gallery from '../data/hnim-gallery.json';
+import { company, people } from '../data/site';
 import Notify from '../components/Notify.astro';
-const plate = 'key/schoolroom.webp';
+// Placeholder until a photograph of Joseph and Jeromy together arrives —
+// this is the pair of them in frame, which is the closest we hold.
+const plate = 'key/two-men.webp';
 export const prerender = true;
 ---
 
 <Base
   title="About — 4est Films"
-  description="4est Films is a Minneapolis film company founded by Joseph Bezenek, creating and collaborating with love since 2015."
+  description="4est Films is an independent production company founded by filmmaker Joseph Bezenek in 2015, developing emotionally ambitious films alongside the artists who believe in them."
 >
   <section class="top wrap">
-    <p class="eyebrow" data-reveal>{company.legal} · {company.base}</p>
+    <p class="eyebrow" data-reveal>{company.line}</p>
     <h1 class="h2" data-reveal style="--delay:80ms">
-      Creating and collaborating<br />with love since {company.since}.
+      Films made with conviction.
     </h1>
+    <p class="h2 top__sub" data-reveal style="--delay:160ms">
+      Created through collaboration.
+    </p>
   </section>
 
   <figure class="plate" data-parallax="0.05">
@@ -23,23 +27,33 @@ export const prerender = true;
   </figure>
 
   <section class="section wrap prose">
-    <p class="lede" data-reveal>
-      A production company built around the artists in the room.
+    <p class="dim" data-reveal>
+      4est Films is an independent production company founded by filmmaker
+      Joseph Bezenek in {company.since}. The company was built to develop
+      emotionally ambitious films alongside artists who believe deeply in the
+      stories they are telling.
     </p>
     <p class="dim" data-reveal style="--delay:100ms">
-      4est Films was founded by Joseph Bezenek after years of work across Los
-      Angeles, London, Minnesota and Arizona, to make films with the artists he
-      wanted in the room — and to take on only the work the company intends to
-      be known for.
+      Its first production, <a href="/films/strung/"><em>Strung</em></a>, grew
+      from Jeromy Darling's years of service and work surrounding addiction and
+      recovery. The short earned twelve awards across eight festivals,
+      including two Best First-Time Director honors, and its premiere raised
+      funds for organizations helping people access addiction treatment.
     </p>
     <p class="dim" data-reveal style="--delay:160ms">
-      The first film, <a href="/films/strung/">Strung</a>, won
-      {strung.totalWins} awards
-      across {strung.festivalCount} festivals, and its premiere raised nearly
-      $15,000 for addiction treatment. The second,
-      <a href="/films/his-name-is-michael/">His Name is Michael</a>, is a western
-      musical shot on location in Nevada — the company's first feature,
-      arriving {hnim.release}.
+      The company's first feature,
+      <a href="/films/his-name-is-michael/"><em>His Name Is Michael</em></a>,
+      expands that collaboration into a supernatural Western musical written by
+      Darling and directed by Bezenek. Set in Virginia City, Nevada, and filmed
+      entirely in South Dakota, the film brings together faith, folklore, music,
+      and the question at the heart of every 4est Films production:
+    </p>
+    <blockquote class="ask" data-reveal style="--delay:220ms">
+      <p>Who are we beneath the names the world has given us?</p>
+    </blockquote>
+    <p class="dim" data-reveal style="--delay:280ms">
+      4est Films makes work shaped by the artists in the room — and takes on
+      only the stories it intends to stand behind.
     </p>
   </section>
 
@@ -60,10 +74,14 @@ export const prerender = true;
     </div>
   </section>
 
+  <!-- The heading names what the button actually does — it goes to Instagram,
+       so it does not ask for a pitch. -->
   <section class="section wrap contact">
-    <p class="eyebrow" data-reveal>Get in touch</p>
-    <h2 class="h2" data-reveal>Tell us what you're making.</h2>
-    <a href={company.instagram} class="link" data-reveal style="--delay:120ms">
+    <h2 class="h2" data-reveal>Follow the story.</h2>
+    <p class="dim contact__note" data-reveal style="--delay:80ms">
+      Behind the scenes, new releases, and what comes next.
+    </p>
+    <a href={company.instagram} class="link" data-reveal style="--delay:160ms">
       @4estfilms <span aria-hidden="true">→</span>
     </a>
   </section>
@@ -78,11 +96,25 @@ export const prerender = true;
   .plate { margin: 0; height: clamp(18rem, 46vh, 34rem); overflow: hidden; }
   .plate img {
     width: 100%; height: 100%; object-fit: cover;
-    transform: translateY(var(--shift, 0)) scale(1.1);
+    transform: translateY(var(--shift, 0)) scale(1.18);
     filter: grayscale(.4) brightness(.7);
   }
-  .prose .lede { margin-bottom: 2rem; }
-  .prose a { color: var(--accent); text-underline-offset: .25em; }
+  .top__sub { color: var(--bone-dim); margin: .3rem 0 0; max-width: none; }
+  .prose a { color: var(--blood-lift); text-underline-offset: .25em; }
+  .prose p + p { margin-top: 1.4em; }
+  .ask {
+    margin: 2.6rem 0;
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2.4rem);
+  }
+  .ask p {
+    font-family: var(--display);
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
+    line-height: 1.2;
+    font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 60;
+    margin: 0;
+    max-width: 28ch;
+  }
 
   .people {
     display: grid;
@@ -96,5 +128,6 @@ export const prerender = true;
   .person__links { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
 
   .contact { text-align: center; }
+  .contact__note { margin: 1.2rem auto 0; }
   .contact .link { margin-top: 2rem; }
 </style>

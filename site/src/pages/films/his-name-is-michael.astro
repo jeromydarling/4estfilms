@@ -1,7 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { hnim } from '../../data/site';
-import gallery from '../../data/hnim-gallery.json';
 import Notify from '../../components/Notify.astro';
 import Trailer from '../../components/Trailer.astro';
 
@@ -11,8 +10,8 @@ export const prerender = true;
 
 <Base
   world="frontier"
-  title="His Name is Michael — a western musical from 4est Films"
-  description="The only priest in Nevada battles demons and outlaws for the soul of a boy with no name. An original western musical: in 1897 a nun tells the orphans in her care the story of Father Manogue, Virginia City, 1867. Releasing Winter 2026."
+  title="His Name is Michael — a supernatural Western musical from 4est Films"
+  description={`${hnim.description} In 1897 a nun tells the orphans in her care the story of Father Manogue, Virginia City, 1867. ${hnim.release}.`}
 >
   <!-- ── hero ── -->
   <section class="hero">
@@ -35,7 +34,8 @@ export const prerender = true;
   <Trailer
     poster="/stills/key/trailer-poster.webp"
     label="Watch the trailer"
-    caption="His Name is Michael — official trailer. Cinematography by Aaron Berger."
+    caption={`${hnim.description} Cinematography by Aaron Berger.`}
+    youtube={hnim.youtube}
   />
 
   <!-- ── frame narrative: the telling, then the tale ── -->
@@ -91,10 +91,11 @@ export const prerender = true;
   <!-- ── production ── -->
   <section class="section diary">
     <div class="wrap">
-      <p class="eyebrow eyebrow--accent" data-reveal>Virginia City, Nevada</p>
+      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.shotIn}</p>
       <h2 class="h2" data-reveal>The production</h2>
       <p class="dim diary__intro" data-reveal style="--delay:120ms">
-        Five sequences that set the shape of the picture.
+        Set in {hnim.setting}, built and shot entirely in South Dakota. Five
+        sequences that set the shape of the picture.
       </p>
     </div>
 
@@ -130,13 +131,13 @@ export const prerender = true;
   <section class="section">
     <div class="wrap">
       <p class="eyebrow" data-reveal>From the set</p>
-      <h2 class="h2" data-reveal>On location</h2>
+      <h2 class="h2" data-reveal>Selected stills</h2>
     </div>
     <div class="grid">
-      {gallery.map((g, i) => (
-        <figure class="grid__cell" data-reveal style={`--delay:${(i % 6) * 60}ms`}>
+      {hnim.gallery.map((file, i) => (
+        <figure class="grid__cell" data-reveal style={`--delay:${(i % 5) * 60}ms`}>
           <img
-            src={`/stills/hnim/${g.file}`}
+            src={`/stills/hnim/${file}`}
             alt="His Name is Michael — production still"
             loading="lazy"
             decoding="async"
@@ -144,13 +145,13 @@ export const prerender = true;
         </figure>
       ))}
     </div>
-    <p class="wrap dim credit">Stills by Ryan McBoyle.</p>
+    <p class="wrap dim credit">Behind-the-scenes photography by Ryan McBoyle.</p>
   </section>
 
   <Notify
     film="his-name-is-michael"
     heading="Know when it opens."
-    note="His Name is Michael arrives Winter 2026. One email when there is a date, a trailer, or a screening near you."
+    note="His Name is Michael arrives late 2026. One email when there is a date, a trailer, or a screening near you."
   />
 
   <!-- ── close ── -->
