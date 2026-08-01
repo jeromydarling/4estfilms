@@ -19,9 +19,9 @@ export const strung = {
   imdb: 'https://www.imdb.com/title/tt10458322/',
   logline:
     'Lost in the forest of his own mind, Eric must rely on the survival skills of an enigmatic nine-year-old boy to help him battle vicious withdrawals and self-deprivation to catalyze change within his family’s cycle of addiction.',
-  directors: ['Joseph Bezenek', 'Ryan H. Reid'],
-  writers: ['Wenonah Wilms', 'Jeromy Darling', 'Joseph Bezenek', 'Ryan H. Reid'],
-  producers: ['Joseph Bezenek', 'Ryan H. Reid', 'Alexander C. Shields', 'Molly Worre'],
+  directors: ['Joseph Bezenek'],
+  writers: ['Wenonah Wilms', 'Jeromy Darling', 'Joseph Bezenek'],
+  producers: ['Joseph Bezenek', 'Alexander C. Shields', 'Molly Worre'],
   cast: [
     ['Jeromy Darling', 'Eric'],
     ['Wyatt Darling', 'The Boy'],
@@ -108,19 +108,35 @@ export const hnim = {
     ['Original music', 'Jeromy Darling & Kurt Larson'],
     ['Stills', 'Ryan McBoyle'],
   ] as [string, string][],
-  // The nine-day shoot, Nov 14–24 2023, from the team's own dispatches.
-  diary: [
-    { day: 1, title: 'Providence', text: 'We shot only 40% of what we scheduled — but we tackled the most difficult part of the script, technically and emotionally. It is also the opening of the film, so it was vital we did it right.' },
-    { day: 2, title: 'All hands', text: 'Every minute of another twelve-hour day. We captured every shot on the schedule.' },
-    { day: 3, title: 'Adjustments', text: 'Massive wind. Drilling feet from our location. A piano half a key off pitch. We worked late into the night and captured some of the most magnificent moments yet.' },
-    { day: 4, title: 'Beauty and pain', text: 'The most difficult day to date — and the most rewarding. One image, filled with light and blood, says it better than we can.' },
-    { day: 5, title: 'A groove', text: 'After four days of intense emotional scenes, a day of adorable ones. A sporadic dance party broke out. One very talented young actor wrapped.' },
-    { day: 6, title: 'From children to demons', text: 'We went from precious children spitting verses in a historically kept 1890 classroom to a demonic presence haunting our main characters in a barn. Our director shed tears for the first time on set.' },
-    { day: 7, title: 'Twenty children', text: 'It started with prayer and ended full of kids. So much energy and joy and focus. We learned a lot from them.' },
-    { day: 8, title: 'Split in two', text: 'One look at the call sheet and it was near impossible to wrap our heads around finishing. We split the team and sent half to another location.' },
-    { day: 9, title: 'Wrap', text: 'A skeleton crew and guerrilla-style shooting. Clear skies, sixty degrees, the Missouri River, and a horse named “Hollywood.”' },
+  // Production notes. `plates` names the stills shown beside each entry —
+  // finished-frame imagery only, no crew or monitors.
+  production: [
+    {
+      title: 'The opening',
+      plates: ["day1_DSC02978.webp", "day3_BAT06105.webp", "day4_DSC03562.webp"],
+      text: 'The production opened on the most demanding sequence in the script — the hardest passage in the film technically and emotionally, and the first thing an audience sees. It was shot first, and shot until it was right.',
+    },
+    {
+      title: 'Light and blood',
+      plates: ["day4_DSC03533.webp", "day8_DSC04866.webp", "day7_DSC04453.webp"],
+      text: 'A single frame carries the whole picture: beauty and violence in the same light. It is the image the production returned to whenever a decision needed settling.',
+    },
+    {
+      title: 'The schoolroom',
+      plates: ["day7_BAT06197.webp", "day7_DSC04509.webp", "day7_DSC04556.webp"],
+      text: 'Twenty child actors in a period-accurate 1890 classroom, reciting verse. The production built the sequence around them, and it became the warmest passage in a film that spends much of its time in the dark.',
+    },
+    {
+      title: 'The barn',
+      plates: ["day4_DSC03681-Enhanced-NR.webp", "day4_DSC03636.webp", "day1_DSC03021.webp"],
+      text: 'From that classroom the picture turns: a presence in a barn that should not be there. The tonal distance between those two sequences is the film in miniature — and the reason it needed a musical to hold it together.',
+    },
+    {
+      title: 'The river',
+      plates: ["day9_DSC05013.webp", "day9_DSC05068.webp", "day9_DSC05088.webp"],
+      text: 'Clear skies, sixty degrees, the Missouri River, and a horse named “Hollywood.” The last frames of principal photography, and the widest the film ever breathes.',
+    },
   ],
-  shootNote: 'Nine days. November 14–24, 2023. Virginia City, Nevada.',
 };
 
 export const people = [
@@ -135,12 +151,6 @@ export const people = [
     name: 'Joseph Bezenek',
     roles: 'Founder · Director',
     imdb: 'https://www.imdb.com/name/nm7417773/',
-    bio: 'Founded 4est Films after working across LA, London, Minnesota and Arizona. Co-directed Strung; directs His Name is Michael. Collaborates with artists met along the way to make new work — and refuses to spend time on anything he is not overwhelmingly passionate about.',
-  },
-  {
-    name: 'Ryan H. Reid',
-    roles: 'Co-Director · Producer',
-    imdb: 'https://www.imdb.com/name/nm8628776/',
-    bio: 'Co-director, co-writer and co-producer of Strung. In the film’s own words, the debut belonged to “Bez and Reid” — a first feature made on determination, love, and care.',
+    bio: 'Founded 4est Films after working across Los Angeles, London, Minnesota and Arizona. Directed Strung to twelve festival awards, and directs His Name is Michael. He builds each production around the artists he wants in the room, and takes on only the work he intends to be known for.',
   },
 ];

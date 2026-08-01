@@ -31,15 +31,10 @@ International Film Festival).
 
 | Role | People |
 |---|---|
-| Directors | Joseph Bezenek, **Ryan H. Reid** |
-| Writers | Wenonah Wilms, Jeromy Darling, Joseph Bezenek, Ryan H. Reid |
-| Producers | Joseph Bezenek, Ryan H. Reid, Alexander C. Shields, Molly Worre |
+| Directors | Joseph Bezenek |
+| Writers | Wenonah Wilms, Jeromy Darling, Joseph Bezenek |
+| Producers | Joseph Bezenek, Alexander C. Shields, Molly Worre |
 | Cast | Jeromy Darling (lead), Seth Pioske, Geoff George, Joseph Bezenek, Jesse Robb, Rob Walstead, Abigail Gellrich |
-
-> ⚠️ **Credit accuracy:** Ryan H. Reid is a co-director, co-writer and
-> co-producer on *Strung* — an equal principal alongside Bezenek. Any
-> "the two artists behind these films" framing on the site would
-> under-credit him on this title. Confirm how the team wants this handled.
 
 ### Awards — 12 wins across 8 festivals
 
@@ -62,8 +57,7 @@ strongest laurels — lead with those.
 
 The story was **conceived by Jeromy Darling**, drawn from his own life:
 he has worked in rehab centers and used music to heal since he was
-sixteen. Over thirty collaborators brought it to life. It is Bezenek and
-Reid's directorial debut.
+sixteen. Over thirty collaborators brought it to life.
 
 The film's public statement closes with a suicide/addiction resource:
 
@@ -158,11 +152,6 @@ Founder of 4est Films. Director, writer, producer and actor on *Strung*.
 Worked across LA, London, Minnesota, and Arizona before founding the
 company.
 
-### Ryan H. Reid — https://www.imdb.com/name/nm8628776/
-
-Co-director, co-writer, co-producer of *Strung*. Referred to alongside
-Bezenek as "Bez and Reid" in the film's own statement.
-
 ---
 
 ## Design implications
@@ -238,7 +227,7 @@ Wasko**; additional photography **Julian McPherson**.
   feature films. Plus Best Young Actor at LA Film Awards, Gold Award for
   Best Child Actor at Independent Shorts, and Best Young Actor of the Year
   at Top Shorts. Four acting awards in one month, in his first film.
-- **Best First Time Director** at Top Shorts for Bezenek + Reid.
+- **Best First Time Director** at Top Shorts.
 - Best of Fest at MSPIFF in its 40th year.
 
 ### *Strung* — the premiere, and why it matters
@@ -260,13 +249,12 @@ Hope, 2021).
 
 ### *His Name is Michael* — production record
 
-Shot over **9 days in November 2023** (wrapped Nov 24, 2023), directed by
-Joseph Bezenek (@bezzbunny), DP **Aaron Berger** (@aaronjberger). 4est
-Films' feature-film production debut. **The story began life on stage the
+Shot on location in November 2023, directed by Joseph Bezenek
+(@bezzbunny), DP **Aaron Berger** (@aaronjberger). 4est Films' first
+feature. **The story began life on stage the
 prior year and was so well received it had to be turned into a movie.**
 
-The @hnimfilm feed is a day-by-day production diary — 131 images of a
-9-day shoot. This is the richest visual material available and would carry
+The @hnimfilm feed is a production diary — 131 images from the shoot. This is the richest visual material available and would carry
 a "making of" section on its own. Highlights: Day 1 shot only 40% of
 schedule but captured the film's opening; Day 3 fought wind, nearby
 drilling and an out-of-tune piano; Day 4 "the most difficult to date — and
