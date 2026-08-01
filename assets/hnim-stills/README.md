@@ -1,38 +1,34 @@
 # His Name is Michael — production stills
 
-47 professional stills from the nine-day shoot (Nov 14–24, 2023), shot on a
-Sony A7 III. Source: the "HNIM Photos" Drive folder shared by
-ryanmcboyle@gmail.com — **Ryan McBoyle should be credited as stills
-photographer** unless the team says otherwise.
+**380 stills** from the nine-day shoot (Nov 14–24, 2023), Sony A7 III.
+Source: the shared "HNIM Photos" Drive folder (owner ryanmcboyle@gmail.com
+— **credit Ryan McBoyle as stills photographer** unless told otherwise).
 
-| Day | Stills | | Day | Stills |
-|---|---|---|---|---|
-| Day 1 | 14 | | Day 6 | 5 |
-| Day 2 | 1 | | Day 7 | 4 |
-| Day 3 | 6 | | Day 8 | 10 |
-| Day 4 | 3 | | Day 9 | 2 |
-| Day 5 | 2 | | **Total** | **47** |
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| Stills | 22 | 50 | 50 | 41 | 50 | 46 | 50 | 50 | 38 |
 
-## What is committed
+## Committed form
 
-Web derivatives only — 2400px-long-edge WebP plus 640px thumbnails, 14 MB
-total. The originals are 165 MB and are **not** committed: unlike the
-Instagram media (whose CDN URLs expire), the Drive folder is a durable
-store the team controls, so committing 165 MB of duplicates would only
-weigh down the repo.
-
-`manifest.json` carries each still's `drive_id`, so any original can be
-re-fetched at any time:
+Web derivatives only — 2400px-long-edge WebP plus 640px thumbnails
+(~127 MB). Originals stay in Drive, which the team controls; `manifest.json`
+records each still's `drive_id`, so any original is one fetch away:
 
 ```
 https://drive.google.com/uc?export=download&id=<drive_id>
 ```
 
-It also records source resolution, capture timestamp, and camera.
+## Two caveats
 
-## Quality note
+1. **Five folders (Days 2, 3, 5, 7, 8) returned exactly 50 files**, which is
+   Drive's lazy-load render cap — those days may hold more than 50. The
+   counts above are a floor, not a confirmed total. Getting the rest needs
+   either a scrolled browser session (blocked here: the sandbox proxy resets
+   Chromium's TLS) or a zip export of the folder.
+2. **17 filenames appeared twice** in Drive and were deduplicated. Image
+   data is keyed by Drive ID and is correct, but a small number of
+   `original_name` values may be mismatched — trust `drive_id` over the
+   filename.
 
-Sources are 2160px on the short edge — already exported down from the
-camera's native resolution, not full-size RAW conversions. Good for web at
-any size the site needs, but if a large print or a 4K hero crop is ever
-wanted, ask for a fresh export from the original files.
+Drive exports are 2160px on the short edge, already downsized from camera
+native. Fine for web; request a fresh export for print or 4K.
