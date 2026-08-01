@@ -80,6 +80,17 @@ jobs:
             d1 execute 4estfilms-db --${{ inputs.target }}
             --file migrations/0003_attribution.sql
 
+      - name: Apply 0004 — email tokens and sends
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0004_email.sql
+
       - name: Confirm schema
         uses: cloudflare/wrangler-action@v3
         with:
