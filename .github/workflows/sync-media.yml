@@ -1,7 +1,10 @@
 name: Sync media to R2
 
-# The Instagram video archive is too heavy to ship in the Worker bundle, so
-# it lives in the R2 bucket and is served through /media/[...key].
+# The trailer and the Instagram video archive are too heavy for the Worker
+# bundle (25 MB per file), so they live in R2 and are served through
+# /media/[...key]. Objects are keyed by their path under assets/:
+#   assets/video/hnim-trailer-1080.mp4  ->  video/hnim-trailer-1080.mp4
+#   assets/instagram/hnimfilm/x.mp4     ->  instagram/hnimfilm/x.mp4
 #
 # Runs when media changes on main, or on demand. Uploads are skipped for
 # objects already present at the same size, so re-running is cheap.
@@ -9,7 +12,7 @@ name: Sync media to R2
 on:
   push:
     branches: [main]
-    paths: ['assets/instagram/**']
+    paths: ['assets/instagram/**', 'assets/video/**']
   workflow_dispatch:
     inputs:
       force:
@@ -48,7 +51,7 @@ jobs:
           uploaded=0; skipped=0; failed=0
 
           while IFS= read -r -d '' f; do
-            key="instagram/${f#assets/instagram/}"
+            key="${f#assets/}"
             size=$(stat -c%s "$f")
 
             if [ "${FORCE:-false}" != "true" ]; then
@@ -67,7 +70,7 @@ jobs:
               failed=$((failed+1))
               echo "::warning::failed to upload $key"
             fi
-          done < <(find assets/instagram \( -name '*.mp4' -o -name '*.mov' \) -print0)
+          done < <(find assets/instagram assets/video \( -name '*.mp4' -o -name '*.mov' \) -print0)
 
           {
             echo "### R2 media sync"

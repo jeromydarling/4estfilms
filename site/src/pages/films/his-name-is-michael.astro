@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 import { hnim } from '../../data/site';
 import gallery from '../../data/hnim-gallery.json';
 import Notify from '../../components/Notify.astro';
+import Trailer from '../../components/Trailer.astro';
 
 const hero = 'key/hero-prayer.webp';
 export const prerender = true;
@@ -29,6 +30,13 @@ export const prerender = true;
       <p class="hero__release" data-reveal style="--delay:360ms">{hnim.release}</p>
     </div>
   </section>
+
+  <!-- ── trailer ── -->
+  <Trailer
+    poster="/stills/key/trailer-poster.webp"
+    label="Watch the trailer"
+    caption="His Name is Michael — official trailer. Cinematography by Aaron Berger."
+  />
 
   <!-- ── the two eras ── -->
   <section class="section wrap">
