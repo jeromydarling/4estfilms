@@ -55,16 +55,32 @@ const {
     const dl = root.querySelector<HTMLAnchorElement>('.trailer__dl')!;
     const base = root.dataset.src!;
 
-    // Prefer VP9 where it is supported — smaller at equal quality. Safari
-    // gets H.264. Resolution follows the viewport, not a media query.
-    const pickSource = () => {
+    // Ordered candidates, best first. VP9 is smaller at equal quality;
+    // Safari and anything without it fall through to H.264. Resolution
+    // follows the viewport, not a media query.
+    const candidates = () => {
       const wide = Math.max(window.innerWidth, window.innerHeight) >= 900;
-      const canWebm = video.canPlayType('video/webm; codecs="vp9"') !== '';
-      if (canWebm && wide) return `${base}-1080.webm`;
-      return wide ? `${base}-1080.mp4` : `${base}-720.mp4`;
+      const list: string[] = [];
+      if (wide && video.canPlayType('video/webm; codecs="vp9"') !== '') {
+        list.push(`${base}-1080.webm`);
+      }
+      if (wide) list.push(`${base}-1080.mp4`);
+      list.push(`${base}-720.mp4`);
+      return list;
     };
 
+    let queue: string[] = [];
+
+    // A missing or undecodable variant should not end the attempt — step to
+    // the next candidate and only surface an error once they are exhausted.
     const fail = () => {
+      const next = queue.shift();
+      if (next) {
+        video.src = next;
+        video.load();
+        void video.play().catch(() => {});
+        return;
+      }
       root.dataset.playing = '';
       video.controls = false;
       dl.href = `${base}-720.mp4`;
@@ -72,7 +88,10 @@ const {
     };
 
     const start = async () => {
-      if (!video.src) video.src = pickSource();
+      if (!video.src) {
+        queue = candidates();
+        video.src = queue.shift()!;
+      }
       root.dataset.playing = 'true';
       video.controls = true;
       try {

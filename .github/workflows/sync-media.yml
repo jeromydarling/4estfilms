@@ -6,8 +6,14 @@ name: Sync media to R2
 #   assets/video/hnim-trailer-1080.mp4  ->  video/hnim-trailer-1080.mp4
 #   assets/instagram/hnimfilm/x.mp4     ->  instagram/hnimfilm/x.mp4
 #
-# Runs when media changes on main, or on demand. Uploads are skipped for
-# objects already present at the same size, so re-running is cheap.
+# On push, only files the push actually touched are uploaded. Run it manually
+# with `all` to sweep the whole tree.
+#
+# An earlier version probed R2 before each upload by fetching the object and
+# comparing byte counts. wrangler has no head/stat for R2, so that meant
+# downloading every object on every run — ~300 MB and 15+ minutes to decide
+# almost nothing needed doing. Diffing the push is both faster and honest
+# about what changed.
 
 on:
   push:
@@ -15,10 +21,11 @@ on:
     paths: ['assets/instagram/**', 'assets/video/**']
   workflow_dispatch:
     inputs:
-      force:
-        description: 'Re-upload every object even if it already exists'
-        type: boolean
-        default: false
+      scope:
+        description: 'changed = files in the last commit; all = every media file'
+        type: choice
+        options: [changed, all]
+        default: changed
 
 concurrency:
   group: sync-media
@@ -33,6 +40,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # need the parent commit to diff against
 
       - uses: actions/setup-node@v4
         with:
@@ -40,46 +49,63 @@ jobs:
 
       - run: npm install -g wrangler@4
 
+      - name: Work out what to upload
+        id: plan
+        env:
+          SCOPE: ${{ inputs.scope || 'changed' }}
+        run: |
+          set -euo pipefail
+          media() { grep -E '\.(mp4|mov|webm)$' || true; }
+
+          if [ "$SCOPE" = "all" ] || ! git rev-parse HEAD^ >/dev/null 2>&1; then
+            git ls-files 'assets/instagram/**' 'assets/video/**' | media > files.txt
+            echo "reason=full sweep" >> "$GITHUB_OUTPUT"
+          else
+            # Added/copied/modified/renamed — never deleted.
+            git diff --name-only --diff-filter=ACMR HEAD^ HEAD -- \
+              assets/instagram assets/video | media > files.txt
+            echo "reason=changed since ${GITHUB_SHA:0:7}^" >> "$GITHUB_OUTPUT"
+          fi
+
+          count=$(wc -l < files.txt)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Planning to upload $count file(s)."
+          sed 's/^/  /' files.txt
+
       - name: Upload
+        if: steps.plan.outputs.count != '0'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FORCE: ${{ inputs.force }}
         run: |
           set -uo pipefail
           BUCKET=4estfilms-media
-          uploaded=0; skipped=0; failed=0
+          uploaded=0; failed=0
 
-          while IFS= read -r -d '' f; do
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
             key="${f#assets/}"
-            size=$(stat -c%s "$f")
-
-            if [ "${FORCE:-false}" != "true" ]; then
-              # `r2 object get --help`-free existence probe: head the object
-              # and compare size. Any failure just means "upload it".
-              remote=$(wrangler r2 object get "$BUCKET/$key" --remote --pipe 2>/dev/null | wc -c || echo 0)
-              if [ "$remote" = "$size" ]; then
-                skipped=$((skipped+1)); continue
-              fi
-            fi
-
+            # `put` overwrites, so re-uploading an unchanged file is harmless.
             if wrangler r2 object put "$BUCKET/$key" --file "$f" --remote >/dev/null 2>&1; then
-              uploaded=$((uploaded+1))
-              echo "  ↑ $key"
+              uploaded=$((uploaded+1)); echo "  ↑ $key"
             else
-              failed=$((failed+1))
-              echo "::warning::failed to upload $key"
+              failed=$((failed+1)); echo "::warning::failed to upload $key"
             fi
-          done < <(find assets/instagram assets/video \( -name '*.mp4' -o -name '*.mov' \) -print0)
+          done < files.txt
 
           {
             echo "### R2 media sync"
             echo
+            echo "Scope: ${{ steps.plan.outputs.reason }}"
+            echo
             echo "| | count |"
             echo "|---|---|"
             echo "| uploaded | $uploaded |"
-            echo "| skipped (already current) | $skipped |"
             echo "| failed | $failed |"
           } >> "$GITHUB_STEP_SUMMARY"
 
           [ "$failed" -eq 0 ] || { echo "::error::$failed object(s) failed to upload"; exit 1; }
+
+      - name: Nothing to do
+        if: steps.plan.outputs.count == '0'
+        run: echo "No media files changed in this push." >> "$GITHUB_STEP_SUMMARY"
