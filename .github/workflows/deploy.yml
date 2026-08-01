@@ -52,10 +52,16 @@ jobs:
       # the pages render and the signup endpoint validates.
       - name: Smoke test the deployment
         env:
-          URL: ${{ steps.deploy.outputs.deployment-url }}
+          # With custom domains bound, wrangler reports the trigger rather
+          # than a URL — the raw output reads "4estfilms.studio (custom
+          # domain)", which curl rejects outright. Take the first field and
+          # add the scheme back.
+          RAW: ${{ steps.deploy.outputs.deployment-url }}
         run: |
           set -euo pipefail
-          [ -n "${URL:-}" ] || { echo "::warning::no deployment URL returned, skipping smoke test"; exit 0; }
+          [ -n "${RAW:-}" ] || { echo "::warning::no deployment URL returned, skipping smoke test"; exit 0; }
+          URL="${RAW%% *}"
+          case "$URL" in http://*|https://*) ;; *) URL="https://$URL" ;; esac
           echo "testing $URL"
 
           for path in / /films/his-name-is-michael/ /films/strung/ /about/; do
@@ -78,6 +84,6 @@ jobs:
           {
             echo "### Worker deploy"
             echo
-            echo "- URL: ${{ steps.deploy.outputs.deployment-url }}"
+            echo "- Trigger: ${{ steps.deploy.outputs.deployment-url }}"
             echo "- Commit: \`${{ github.sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
