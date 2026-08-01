@@ -18,9 +18,8 @@ they sort chronologically.
 
 ## Highlights — 207 items
 
-**`hnimfilm/highlights/Day_1` … `Day_9` is a complete day-by-day video
-diary of the His Name is Michael shoot** (Nov 14–24, 2023), 184 items,
-mostly video. This is the single richest asset in the repo.
+**`hnimfilm/highlights/` holds the His Name is Michael production video
+diary**, 184 items, mostly video. This is the single richest asset in the repo.
 
 | Highlight | Items |
 |---|---|

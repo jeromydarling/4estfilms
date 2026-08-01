@@ -1,6 +1,6 @@
 # His Name is Michael — production stills
 
-**380 stills** from the nine-day shoot (Nov 14–24, 2023), Sony A7 III.
+**380 stills** from the production (November 2023), Sony A7 III.
 Source: the shared "HNIM Photos" Drive folder (owner ryanmcboyle@gmail.com
 — **credit Ryan McBoyle as stills photographer** unless told otherwise).
 

@@ -4,8 +4,6 @@ import { hnim } from '../../data/site';
 import gallery from '../../data/hnim-gallery.json';
 import Notify from '../../components/Notify.astro';
 
-const byDay: Record<string, typeof gallery> = {};
-for (const g of gallery) (byDay[g.day] ??= []).push(g);
 const hero = 'key/hero-prayer.webp';
 export const prerender = true;
 ---
@@ -71,32 +69,32 @@ export const prerender = true;
     </dl>
   </section>
 
-  <!-- ── nine days ── -->
+  <!-- ── production ── -->
   <section class="section diary">
     <div class="wrap">
-      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.shootNote}</p>
-      <h2 class="h2" data-reveal>Nine days</h2>
+      <p class="eyebrow eyebrow--accent" data-reveal>Virginia City, Nevada</p>
+      <h2 class="h2" data-reveal>The production</h2>
       <p class="dim diary__intro" data-reveal style="--delay:120ms">
-        The company posted from set every day of the shoot. This is what they wrote.
+        Five sequences that set the shape of the picture.
       </p>
     </div>
 
     <ol class="diary__list">
-      {hnim.diary.map((d) => {
-        const shots = byDay[`Day ${d.day}`] ?? [];
+      {hnim.production.map((n, i) => {
+        const shots = n.plates;
         return (
           <li class="day" data-reveal>
             <div class="wrap day__inner">
               <div class="day__text">
-                <p class="day__num">Day {String(d.day).padStart(2, '0')}</p>
-                <h3 class="h3">{d.title}</h3>
-                <p class="dim">{d.text}</p>
+                <p class="day__num">{String(i + 1).padStart(2, '0')}</p>
+                <h3 class="h3">{n.title}</h3>
+                <p class="dim">{n.text}</p>
               </div>
               <div class="day__shots">
-                {shots.slice(0, 3).map((s) => (
+                {shots.slice(0, 3).map((file) => (
                   <img
-                    src={`/stills/hnim/${s.file}`}
-                    alt={`His Name is Michael — day ${d.day} production still`}
+                    src={`/stills/hnim/${file}`}
+                    alt={`His Name is Michael — ${n.title}`}
                     loading="lazy"
                     decoding="async"
                   />
@@ -113,14 +111,14 @@ export const prerender = true;
   <section class="section">
     <div class="wrap">
       <p class="eyebrow" data-reveal>From the set</p>
-      <h2 class="h2" data-reveal>Virginia City, November</h2>
+      <h2 class="h2" data-reveal>On location</h2>
     </div>
     <div class="grid">
       {gallery.map((g, i) => (
         <figure class="grid__cell" data-reveal style={`--delay:${(i % 6) * 60}ms`}>
           <img
             src={`/stills/hnim/${g.file}`}
-            alt={`His Name is Michael — ${g.day} production still`}
+            alt="His Name is Michael — production still"
             loading="lazy"
             decoding="async"
           />
