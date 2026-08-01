@@ -90,9 +90,10 @@ understand, teach, and raise our own children with the love they deserve."*
 
 ### Detail
 
-Set in **Virginia City, Nevada — across both 1867 and 1890**. 1867 is
-shortly after the mining bonanza that made it the most important
-industrial city between Denver and San Francisco. Loosely based on
+A **frame narrative** set entirely in Virginia City, Nevada: the film opens
+in **1897** at the orphanage, where Sr. Maria tells the children the story
+of **1867** — shortly after the mining bonanza that made it the most
+important industrial city between Denver and San Francisco. Loosely based on
 **Father Patrick Manogue**, the only priest in the state, who earned a
 reputation as *"Wyatt Earp with a collar"* — feared by disreputable men,
 loved by everyone he helped.
@@ -200,15 +201,23 @@ like/comment counts, and local filenames.
    that story, set in 1867. The script intercuts between schoolroom and
    story continuously rather than switching once.
 
-   **⚠️ The frame year needs confirming.** The team said 1890, but the
-   script's own dialogue puts it at 1897: Sr. Maria says Manogue died
-   "just 2 years ago on February 27, 1895." Either the draft moved or 1890
-   is from memory. The site currently says 1890 — one value in
-   `site.ts`.
+   **The frame year is 1897** — confirmed by the team, and consistent with
+   Sr. Maria's narration placing it two years after Manogue's death on
+   27 February 1895. The tale is 1867, thirty years earlier. The @hnimfilm
+   IG bio still says "1890 Western Movie Musical" and is worth updating.
 
-   **⚠️ Do not put the ending on the site.** The final scene reveals the
-   groundskeeper is Michael grown, via the scarring on his back. It is the
-   film's last image and the site deliberately withholds it.
+   **⚠️ Do not put either film's ending on the site.** *His Name is Michael*
+   closes by revealing the groundskeeper is Michael grown, via the scarring
+   on his back. *Strung* turns on the same device: Wilder is Eric's younger
+   self, established when Eric finds the matching scar on the boy's hand.
+   Both are the final beat of their film. The site withholds both
+   deliberately — the character is credited as "Wilder", which gives
+   nothing away.
+
+   Worth noting for future copy: the two films share a structural
+   signature — a scar identifying someone across time, and a character who
+   rejects the name they are given. Strong material for a company-level
+   statement once both films are out; too revealing before then.
 2. **Release: Winter 2026.** Not 2024 (stale) and not just "2026." The
    @4estfilms bio should be updated to match. This is a near-term release
    — the site is launch collateral, not a placeholder.
