@@ -1,0 +1,97 @@
+{
+  "account": "hnimfilm",
+  "highlight": "Day 6",
+  "reel_id": "highlight:18003868331502323",
+  "items": [
+    {
+      "file": "001_2023-11-19.mp4",
+      "date": "2023-11-19",
+      "is_video": true,
+      "text": []
+    },
+    {
+      "file": "002_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "003_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "004_2023-11-19.mp4",
+      "date": "2023-11-19",
+      "is_video": true,
+      "text": []
+    },
+    {
+      "file": "005_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "006_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "007_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "008_2023-11-19.mp4",
+      "date": "2023-11-19",
+      "is_video": true,
+      "text": []
+    },
+    {
+      "file": "009_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "010_2023-11-19.jpg",
+      "date": "2023-11-19",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 19, 2023."
+      ]
+    },
+    {
+      "file": "011_2023-11-20.jpg",
+      "date": "2023-11-20",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 20, 2023."
+      ]
+    },
+    {
+      "file": "012_2023-11-20.jpg",
+      "date": "2023-11-20",
+      "is_video": false,
+      "text": [
+        "Photo by His Name Is Michael | Film on November 20, 2023."
+      ]
+    }
+  ]
+}
