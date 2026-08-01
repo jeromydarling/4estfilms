@@ -1,11 +1,16 @@
 @import '@fontsource-variable/fraunces';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
 
 /* ─────────────────────────────────────────────────────────────
    4est Films — design tokens
-   Two worlds under one roof: the Forest (Strung) and the
-   Frontier (His Name is Michael). The shell stays near-black
-   and lets each film bring its own light.
+   Taken from the identity: the logo pairs a blocky, pixelled
+   "4EST" with a hand-drawn "Films" whose stem grows roots, and
+   the animated sting plays it as worn videotape — PLAY marker,
+   counting-down timecode, scanlines — over oxblood.
+   So: oxblood is the house colour, monospace carries the
+   machine half of that pairing, and the serif carries the drawn
+   half. Each film still brings its own ground.
    ───────────────────────────────────────────────────────────── */
 
 :root {
@@ -17,6 +22,10 @@
   --bone-dim:   #b9b2a5;
   --bone-faint: #6c675e;
   --rule:       #23262b;
+
+  /* house colour, sampled from the logo sting */
+  --blood:      #96001f;
+  --blood-lift: #c4082e;
 
   /* the forest — Strung */
   --forest-deep: #0d1712;
@@ -30,10 +39,11 @@
   --lantern:     #d9a441;
   --ember:       #8a3520;
 
-  --accent: var(--lantern);
+  --accent: var(--blood);
 
   --display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
   --sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
 
   --pad: clamp(1.25rem, 5vw, 5rem);
   --measure: 62ch;
@@ -85,15 +95,31 @@ h1, h2, h3 {
 .h3 { font-size: clamp(1.4rem, 2.6vw, 2.1rem); line-height: 1.1; }
 
 .eyebrow {
-  font-family: var(--sans);
-  font-size: .72rem;
+  font-family: var(--mono);
+  font-size: .7rem;
   font-weight: 500;
-  letter-spacing: .28em;
+  letter-spacing: .22em;
   text-transform: uppercase;
   color: var(--bone-faint);
   margin: 0 0 1.25rem;
 }
-.eyebrow--accent { color: var(--accent); }
+
+/* videotape timecode, as in the sting.
+   Uses the lifted red: #96001f is right for fills and rules but drops
+   below a readable contrast as small text on a dark photograph. */
+.timecode {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .1em;
+  color: var(--blood-lift);
+  font-variant-numeric: tabular-nums;
+}
+.timecode::before {
+  content: '▶';
+  margin-right: .6em;
+  font-size: .8em;
+}
+.eyebrow--accent { color: var(--blood-lift); }
 
 .lede {
   font-family: var(--display);
@@ -135,6 +161,24 @@ p { max-width: var(--measure); }
 }
 @media (prefers-reduced-motion: reduce) { .grain { animation: none; opacity: .1; } }
 
+/* scanlines — the sting reads as worn tape, so the page does too.
+   Kept faint; at 3px pitch it reads as texture, not as a filter. */
+.scan {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  opacity: .35;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .22) 0px,
+    rgba(0, 0, 0, .22) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+@media (prefers-reduced-motion: reduce) { .scan { opacity: .2; } }
+
 /* vignette — the edge of the frame */
 .vignette {
   position: fixed; inset: 0; z-index: 9998; pointer-events: none;
@@ -167,9 +211,10 @@ p { max-width: var(--measure); }
   display: inline-flex;
   align-items: baseline;
   gap: .6em;
-  font-size: .8rem;
+  font-family: var(--mono);
+  font-size: .76rem;
   font-weight: 500;
-  letter-spacing: .18em;
+  letter-spacing: .16em;
   text-transform: uppercase;
   text-decoration: none;
   color: var(--bone);
@@ -177,7 +222,7 @@ p { max-width: var(--measure); }
   border-bottom: 1px solid var(--rule);
   transition: border-color .5s var(--ease), color .5s var(--ease), gap .5s var(--ease);
 }
-.link:hover { border-color: var(--accent); color: var(--accent); gap: 1.1em; }
+.link:hover { border-color: var(--blood-lift); color: var(--blood-lift); gap: 1.1em; }
 
 /* ── laurels ────────────────────────────────────────────── */
 
@@ -189,10 +234,11 @@ p { max-width: var(--measure); }
   padding: 1.1rem 0;
   border-bottom: 1px solid var(--rule);
 }
-.laurel__leaf { color: var(--accent); font-size: 1.1rem; line-height: 1; }
+.laurel__leaf { color: var(--blood-lift); font-size: 1.1rem; line-height: 1; }
 .laurel__name { font-family: var(--display); font-size: clamp(1.05rem, 1.9vw, 1.5rem); }
 .laurel__prize {
-  font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: .7rem; letter-spacing: .18em; text-transform: uppercase;
   color: var(--bone-dim); text-align: right;
 }
 
