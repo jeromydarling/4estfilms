@@ -77,7 +77,9 @@ a { color: inherit; }
 
 /* ── type ───────────────────────────────────────────────── */
 
-h1, h2, h3 {
+/* The classes are listed alongside the elements so .h2 on a <p> — a heading
+   in look but not in outline — gets the family, not just the size. */
+h1, h2, h3, .display, .h2, .h3 {
   font-family: var(--display);
   font-weight: 400;
   font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 120;

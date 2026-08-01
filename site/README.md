@@ -1,4 +1,4 @@
-# 4estfilms.com
+# 4estfilms.studio
 
 Astro 5, static output, no client framework. Ships ~4 KB of JS (scroll
 reveal + parallax); everything else is HTML and CSS.
@@ -50,7 +50,7 @@ Token scopes:
 | Workers R2 Storage: Edit | `sync-media.yml` |
 | Workers KV Storage: Edit | the `SESSION` binding |
 | **D1: Edit** | `migrate.yml` **only** |
-| Zone → DNS: Edit + Workers Routes: Edit | binding `4estfilms.com` |
+| Zone → DNS: Edit + Workers Routes: Edit | binding `4estfilms.studio` |
 
 `wrangler d1 execute --file` goes through Cloudflare's D1 *import* API, which
 needs **D1: Edit** specifically. Without it the call fails with

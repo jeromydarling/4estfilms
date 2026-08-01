@@ -5,13 +5,24 @@ interface Props {
   poster: string;
   label?: string;
   caption?: string;
+  /** YouTube video ID or watch URL, once the official upload exists. */
+  youtube?: string | null;
 }
 const {
   src = '/media/video/hnim-trailer',
   poster,
   label = 'Watch the trailer',
   caption,
+  youtube = null,
 } = Astro.props;
+
+// The video stays on the page — the YouTube link is a secondary way out for
+// people who want the views to land on the official upload.
+const youtubeHref = youtube
+  ? youtube.startsWith('http')
+    ? youtube
+    : `https://www.youtube.com/watch?v=${youtube}`
+  : null;
 ---
 
 <section class="trailer" data-src={src}>
@@ -44,7 +55,16 @@ const {
       <a class="trailer__dl" download>Download it instead.</a>
     </p>
   </div>
-  {caption && <p class="wrap dim trailer__caption">{caption}</p>}
+  {(caption || youtubeHref) && (
+    <div class="wrap trailer__under">
+      {caption && <p class="dim trailer__caption">{caption}</p>}
+      {youtubeHref && (
+        <a class="link trailer__yt" href={youtubeHref} target="_blank" rel="noopener">
+          Watch on YouTube <span aria-hidden="true">→</span>
+        </a>
+      )}
+    </div>
+  )}
 </section>
 
 <script>
@@ -200,8 +220,14 @@ const {
   }
   .trailer__dl { color: var(--accent); }
 
-  .trailer__caption {
+  .trailer__under {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem 2rem;
     margin-top: 1.2rem;
-    font-size: .8rem;
   }
+  .trailer__caption { font-size: .8rem; margin: 0; }
+  .trailer__yt { flex: none; }
 </style>

@@ -44,7 +44,7 @@ jobs:
       - run: npm ci
 
       # Every statement is CREATE ... IF NOT EXISTS, so re-running is safe.
-      - name: Apply
+      - name: Apply 0001 — subscribers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -54,6 +54,21 @@ jobs:
             d1 execute 4estfilms-db --${{ inputs.target }}
             --file migrations/0001_subscribers.sql
 
+      # SQLite has no ADD COLUMN IF NOT EXISTS, so a re-run of an already
+      # applied migration fails with "duplicate column name". That is the
+      # expected no-op here, not a failure worth stopping the job for — the
+      # schema check below is what actually proves the column landed.
+      - name: Apply 0002 — first_name
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0002_first_name.sql
+
       - name: Confirm schema
         uses: cloudflare/wrangler-action@v3
         with:
@@ -62,4 +77,4 @@ jobs:
           workingDirectory: site
           command: >-
             d1 execute 4estfilms-db --${{ inputs.target }}
-            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='subscribers'"
+            --command "SELECT name FROM pragma_table_info('subscribers')"

@@ -2,7 +2,7 @@ import { defineConfig } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 
 export default defineConfig({
-  site: 'https://www.4estfilms.com',
+  site: 'https://4estfilms.studio',
   output: 'server',
   adapter: cloudflare({
     imageService: 'compile',

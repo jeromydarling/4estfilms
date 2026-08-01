@@ -1,10 +1,16 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { strung } from '../../data/site';
-import stills from '../../data/strung-gallery.json';
 import Notify from '../../components/Notify.astro';
+import YouTube from '../../components/YouTube.astro';
 
-const hero = stills.find((s) => s.file.includes('CI4q_yUgNeX')) ?? stills[0];
+// The old "Frames" grid was mostly trailer title cards, quote graphics and a
+// unit photo of the crew in modern clothes. Of the seven images we hold, one
+// is an actual frame from the film — it is the hero below. The rest of the
+// grid comes back when the full-resolution stills arrive; until then the page
+// shows the two pieces of official key art rather than padding.
+const hero = '2020-12-17_CI4q_yUgNeX_01.jpg';
+const poster = '2020-12-21_CJE3HIjg9Lx_01.jpg';
 export const prerender = true;
 ---
 
@@ -16,7 +22,7 @@ export const prerender = true;
   <!-- ── hero ── -->
   <section class="hero">
     <div class="hero__art" data-parallax="0.06">
-      <img src={`/stills/strung/${hero.file}`} alt="" loading="eager" decoding="async" />
+      <img src={`/stills/strung/${hero}`} alt="" loading="eager" decoding="async" />
     </div>
     <div class="hero__scrim" aria-hidden="true"></div>
     <div class="wrap hero__body">
@@ -29,6 +35,16 @@ export const prerender = true;
       </p>
     </div>
   </section>
+
+  <!-- ── trailer ── renders as soon as strung.youtube holds the official ID -->
+  {strung.youtube && (
+    <YouTube
+      id={strung.youtube}
+      title="Strung — official trailer"
+      poster="/stills/strung/2020-12-21_CJE3HIjg9Lx_01.jpg"
+      caption="Strung — official trailer."
+    />
+  )}
 
   <!-- ── logline ── -->
   <section class="section wrap">
@@ -51,33 +67,42 @@ export const prerender = true;
   </section>
 
   <!-- ── awards ── -->
-  <section class="section wrap awards">
-    <div>
-      <p class="eyebrow" data-reveal>Selected honours</p>
-      <h2 class="h2" data-reveal>{strung.totalWins} wins<br />across {strung.festivalCount} festivals</h2>
-    </div>
-    <ul class="awards__list">
-      {strung.awards.map(([fest, prize, yr], i) => (
-        <li class="laurel" data-reveal style={`--delay:${i * 55}ms`}>
-          <span class="laurel__leaf" aria-hidden="true">❧</span>
-          <span class="laurel__name">{fest}</span>
-          <span class="laurel__prize">{prize} · {yr}</span>
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>Selected honors</p>
+    <ol class="awards">
+      {strung.featuredAwards.map(([prize, fest], i) => (
+        <li class="award" data-reveal style={`--delay:${i * 70}ms`}>
+          <span class="award__leaf" aria-hidden="true">❧</span>
+          <p class="award__prize">{prize}</p>
+          <p class="award__fest">{fest}</p>
         </li>
       ))}
-    </ul>
+    </ol>
+    <div class="awards__foot" data-reveal>
+      <p class="awards__total">
+        {strung.totalWins} awards across {strung.festivalCount} festivals
+      </p>
+      <a class="link" href={strung.imdbAwards} target="_blank" rel="noopener">
+        View all awards <span aria-hidden="true">→</span>
+      </a>
+    </div>
   </section>
 
-  <!-- ── stills ── -->
-  <section class="section">
-    <div class="wrap"><p class="eyebrow" data-reveal>Frames</p></div>
-    <div class="grid">
-      {stills.map((s, i) => (
-        <figure class="grid__cell" data-reveal style={`--delay:${(i % 4) * 70}ms`}>
-          <img src={`/stills/strung/${s.file}`} alt="Strung — film still" loading="lazy" decoding="async" />
-        </figure>
-      ))}
+  <!-- ── key art ── -->
+  <section class="section wrap art">
+    <figure class="art__cell" data-reveal>
+      <img src={`/stills/strung/${poster}`} alt="Strung — official poster" loading="lazy" decoding="async" />
+    </figure>
+    <div class="art__side">
+      <p class="eyebrow" data-reveal>Key art</p>
+      <p class="lede" data-reveal style="--delay:100ms">
+        The poster that carried the film's first festival laurel.
+      </p>
+      <p class="dim art__note" data-reveal style="--delay:180ms">
+        Official Selection, Top Shorts Film Festival, 2020 — the first of
+        {strung.totalWins} wins across {strung.festivalCount} festivals.
+      </p>
     </div>
-    <p class="wrap dim credit">Stills by Forrest Wasko.</p>
   </section>
 
   <!-- ── credits ── -->
@@ -86,10 +111,12 @@ export const prerender = true;
       <div>
         <p class="eyebrow" data-reveal>Directed by</p>
         <ul class="plain" data-reveal>{strung.directors.map((d) => <li>{d}</li>)}</ul>
-        <p class="eyebrow" data-reveal style="--delay:80ms">Written by</p>
-        <ul class="plain" data-reveal style="--delay:80ms">{strung.writers.map((d) => <li>{d}</li>)}</ul>
-        <p class="eyebrow" data-reveal style="--delay:160ms">Produced by</p>
-        <ul class="plain" data-reveal style="--delay:160ms">{strung.producers.map((d) => <li>{d}</li>)}</ul>
+        <p class="eyebrow" data-reveal style="--delay:60ms">Co-directed by</p>
+        <ul class="plain" data-reveal style="--delay:60ms">{strung.coDirectors.map((d) => <li>{d}</li>)}</ul>
+        <p class="eyebrow" data-reveal style="--delay:120ms">Written by</p>
+        <ul class="plain" data-reveal style="--delay:120ms">{strung.writers.map((d) => <li>{d}</li>)}</ul>
+        <p class="eyebrow" data-reveal style="--delay:180ms">Produced by</p>
+        <ul class="plain" data-reveal style="--delay:180ms">{strung.producers.map((d) => <li>{d}</li>)}</ul>
       </div>
       <div>
         <p class="eyebrow" data-reveal>Cast</p>
@@ -183,30 +210,73 @@ export const prerender = true;
   }
   .head .dim { font-size: .93rem; }
 
+  /* two rows of three, collapsing to two then one */
   .awards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: grid;
-    gap: clamp(2.5rem, 6vw, 5rem);
-    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
-    align-items: start;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
   }
-  .awards__list { list-style: none; margin: 0; padding: 0; }
-  @media (max-width: 860px) { .awards { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) { .awards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 520px) { .awards { grid-template-columns: 1fr; } }
 
-  .grid {
+  .award {
+    background: var(--ground);
+    padding: clamp(1.6rem, 3vw, 2.4rem);
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    align-content: start;
     gap: .5rem;
+  }
+  .award__leaf { color: var(--blood-lift); font-size: 1.15rem; line-height: 1; }
+  .award__prize {
+    font-family: var(--display);
+    font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+    line-height: 1.1;
+    margin: .3rem 0 0;
+    text-wrap: balance;
+  }
+  .award__fest {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+    margin: 0;
+  }
+
+  .awards__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem 2rem;
     margin-top: 2rem;
-    padding-inline: .5rem;
   }
-  .grid__cell { margin: 0; overflow: hidden; }
-  .grid__cell img {
-    width: 100%; aspect-ratio: 4 / 5; object-fit: cover;
-    filter: brightness(.82) saturate(.85);
-    transition: filter .6s var(--ease), transform .8s var(--ease);
+  .awards__total {
+    font-family: var(--display);
+    font-size: clamp(1.3rem, 2.6vw, 1.9rem);
+    margin: 0;
   }
-  .grid__cell:hover img { filter: none; transform: scale(1.05); }
-  .credit { margin-top: 1.5rem; font-size: .8rem; }
+
+  .art {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+    align-items: center;
+  }
+  @media (max-width: 760px) { .art { grid-template-columns: 1fr; } }
+  .art__cell { margin: 0; }
+  .art__cell img {
+    width: 100%;
+    filter: brightness(.92);
+    transition: filter .6s var(--ease);
+  }
+  .art__cell:hover img { filter: none; }
+  .art__note { margin-top: 1.6rem; font-size: .92rem; max-width: 40ch; }
 
   .cols {
     display: grid;
