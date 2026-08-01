@@ -35,15 +35,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Idempotent — every statement is CREATE ... IF NOT EXISTS, so this is
-      # safe to re-run on every deploy.
-      - name: Apply D1 migrations
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: site
-          command: d1 execute 4estfilms-db --remote --file migrations/0001_subscribers.sql
+      # Schema changes run from the separate "Migrate D1" workflow, not here.
+      # Coupling them meant every site deploy needed D1 write on the token and
+      # a database hiccup could block shipping the site.
 
       - name: Deploy
         id: deploy
