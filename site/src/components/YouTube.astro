@@ -7,8 +7,10 @@ interface Props {
   poster?: string;
   caption?: string;
   label?: string;
+  /** Slug recorded against playback events. */
+  film?: string;
 }
-const { id, title, poster, caption, label = 'Watch the trailer' } = Astro.props;
+const { id, title, poster, caption, label = 'Watch the trailer', film } = Astro.props;
 
 // Accept an ID or any of the URL shapes people paste.
 const videoId =
@@ -22,7 +24,7 @@ const fallback = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
 const watch = `https://www.youtube.com/watch?v=${videoId}`;
 ---
 
-<section class="yt" data-src={src}>
+<section class="yt" data-src={src} data-film={film}>
   <div class="yt__frame">
     <img class="yt__poster" src={poster ?? fallback} alt="" loading="lazy" decoding="async" />
     <button class="yt__play" type="button" aria-label={`${label} — ${title}`}>
@@ -43,13 +45,25 @@ const watch = `https://www.youtube.com/watch?v=${videoId}`;
 </section>
 
 <script>
+  import { capture, track } from '../lib/attribution';
+
+  capture();
+
   for (const root of document.querySelectorAll<HTMLElement>('.yt')) {
     const play = root.querySelector<HTMLButtonElement>('.yt__play')!;
     const frame = root.querySelector<HTMLElement>('.yt__frame')!;
+    const film = root.dataset.film || undefined;
+
+    for (const a of root.querySelectorAll<HTMLAnchorElement>('.yt__out')) {
+      a.addEventListener('click', () => track('trailer_youtube_out', film ? { film } : {}));
+    }
 
     play.addEventListener(
       'click',
       () => {
+        // The only mark we get. Once the iframe takes over, completion is
+        // YouTube's to report, not ours.
+        track('trailer_start', film ? { film } : {});
         const iframe = document.createElement('iframe');
         iframe.src = root.dataset.src!;
         iframe.title = play.getAttribute('aria-label')!;

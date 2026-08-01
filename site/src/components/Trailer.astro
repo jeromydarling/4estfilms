@@ -7,6 +7,8 @@ interface Props {
   caption?: string;
   /** YouTube video ID or watch URL, once the official upload exists. */
   youtube?: string | null;
+  /** Slug recorded against playback events. */
+  film?: string;
 }
 const {
   src = '/media/video/hnim-trailer',
@@ -14,6 +16,7 @@ const {
   label = 'Watch the trailer',
   caption,
   youtube = null,
+  film = 'his-name-is-michael',
 } = Astro.props;
 
 // The video stays on the page — the YouTube link is a secondary way out for
@@ -25,7 +28,7 @@ const youtubeHref = youtube
   : null;
 ---
 
-<section class="trailer" data-src={src}>
+<section class="trailer" data-src={src} data-film={film}>
   <div class="trailer__frame">
     <!--
       No <source> children: the `media` attribute is not honoured reliably
@@ -68,12 +71,40 @@ const youtubeHref = youtube
 </section>
 
 <script>
+  import { capture, track } from '../lib/attribution';
+
+  capture();
+
   for (const root of document.querySelectorAll<HTMLElement>('.trailer')) {
     const video = root.querySelector<HTMLVideoElement>('.trailer__video')!;
     const play = root.querySelector<HTMLButtonElement>('.trailer__play')!;
     const err = root.querySelector<HTMLParagraphElement>('.trailer__error')!;
     const dl = root.querySelector<HTMLAnchorElement>('.trailer__dl')!;
     const base = root.dataset.src!;
+    const film = root.dataset.film || undefined;
+
+    // Quarter marks, each sent once. Watching the whole thing and scrubbing
+    // back must not report a second view of the same quarter.
+    const sent = new Set<string>();
+    const mark = (name: string) => {
+      if (sent.has(name)) return;
+      sent.add(name);
+      track(name, film ? { film } : {});
+    };
+
+    video.addEventListener('timeupdate', () => {
+      const d = video.duration;
+      if (!d || !isFinite(d)) return;
+      const pct = video.currentTime / d;
+      if (pct >= 0.25) mark('trailer_25');
+      if (pct >= 0.5) mark('trailer_50');
+      if (pct >= 0.75) mark('trailer_75');
+    });
+    video.addEventListener('ended', () => mark('trailer_complete'));
+
+    for (const a of root.querySelectorAll<HTMLAnchorElement>('.trailer__yt')) {
+      a.addEventListener('click', () => track('trailer_youtube_out', film ? { film } : {}));
+    }
 
     // Ordered candidates, best first. VP9 is smaller at equal quality;
     // Safari and anything without it fall through to H.264. Resolution
@@ -114,6 +145,7 @@ const youtubeHref = youtube
       }
       root.dataset.playing = 'true';
       video.controls = true;
+      mark('trailer_start');
       try {
         await video.play();
       } catch {
