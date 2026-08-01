@@ -1,9 +1,11 @@
 ---
 const path = Astro.url.pathname;
+// Short forms are used on narrow screens — the full title wraps onto the
+// wordmark below ~560px.
 const links = [
-  ['/films/his-name-is-michael/', 'His Name is Michael'],
-  ['/films/strung/', 'Strung'],
-  ['/about/', 'About'],
+  ['/films/his-name-is-michael/', 'His Name is Michael', 'Michael'],
+  ['/films/strung/', 'Strung', 'Strung'],
+  ['/about/', 'About', 'About'],
 ];
 const isHome = path === '/';
 ---
@@ -16,9 +18,12 @@ const isHome = path === '/';
 
   <nav aria-label="Primary">
     <ul>
-      {links.map(([href, label]) => (
+      {links.map(([href, label, short]) => (
         <li>
-          <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>
+          <a href={href} aria-current={path === href ? 'page' : undefined}>
+            <span class="full">{label}</span>
+            <span class="short" aria-hidden="true">{short}</span>
+          </a>
         </li>
       ))}
     </ul>
@@ -78,9 +83,18 @@ const isHome = path === '/';
   }
   nav a:hover, nav a[aria-current='page'] { opacity: 1; }
 
+  .short { display: none; }
+
   @media (max-width: 640px) {
-    .nav { padding-block: 1rem; }
+    .nav { padding-block: 1rem; gap: 1rem; }
     .nav__films { display: none; }
-    nav a { font-size: .6rem; letter-spacing: .14em; }
+    nav a { font-size: .62rem; letter-spacing: .12em; }
+    nav ul { gap: 1.1rem; }
+  }
+
+  /* below this the full title wraps and collides with the wordmark */
+  @media (max-width: 560px) {
+    .full { display: none; }
+    .short { display: inline; }
   }
 </style>
