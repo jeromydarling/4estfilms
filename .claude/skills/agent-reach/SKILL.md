@@ -55,11 +55,20 @@ bash .claude/skills/agent-reach/bootstrap.sh
 export PATH="$HOME/.agent-reach-venv/bin:$PATH"
 ```
 
-Known limits in the sandboxed remote environment: Jina Reader (`r.jina.ai`)
-rejects the container's IP anonymously, so prefer Exa (`mcporter call
-'exa.web_search_exa(...)'`) or `WebFetch` for plain web reads. Cookie- and
-Chrome-backed channels (Twitter, Reddit, 小红书, Facebook, Instagram, 雪球)
-need credentials or a desktop browser and are not available here.
+Known limits in the sandboxed remote environment:
+
+- Jina Reader (`r.jina.ai`) sometimes returns `401 AuthenticationRequiredError`
+  for anonymous queries from datacenter IPs. This is a transient rate-limit —
+  retry, or fall back to Exa (`mcporter call 'exa.web_search_exa(...)'`) or
+  `WebFetch`.
+- **OpenCLI-backed channels cannot work here at all.** OpenCLI is a Chrome
+  extension talking to a same-machine binary over localhost. This skill runs in
+  a remote container, so it can never reach the user's local Chrome. That rules
+  out Facebook and Instagram entirely, and forces Reddit onto the `rdt-cli` +
+  cookie path.
+- Cookie-backed channels (Twitter, Reddit, 小红书, 雪球) do work remotely, but
+  only once the user exports cookies via Cookie-Editor and provides them.
+  Use a secondary account — cookies grant full account access.
 
 ## 常驻规则（全程适用）
 
