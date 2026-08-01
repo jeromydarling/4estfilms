@@ -2,10 +2,12 @@
 import Base from '../../layouts/Base.astro';
 import { hnim } from '../../data/site';
 import gallery from '../../data/hnim-gallery.json';
+import Notify from '../../components/Notify.astro';
 
 const byDay: Record<string, typeof gallery> = {};
 for (const g of gallery) (byDay[g.day] ??= []).push(g);
 const hero = 'key/hero-prayer.webp';
+export const prerender = true;
 ---
 
 <Base
@@ -127,6 +129,12 @@ const hero = 'key/hero-prayer.webp';
     </div>
     <p class="wrap dim credit">Stills by Ryan McBoyle.</p>
   </section>
+
+  <Notify
+    film="his-name-is-michael"
+    heading="Know when it opens."
+    note="His Name is Michael arrives Winter 2026. One email when there is a date, a trailer, or a screening near you."
+  />
 
   <!-- ── close ── -->
   <section class="section wrap close">

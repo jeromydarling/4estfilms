@@ -2,7 +2,9 @@
 import Base from '../layouts/Base.astro';
 import { company, people, strung, hnim } from '../data/site';
 import gallery from '../data/hnim-gallery.json';
+import Notify from '../components/Notify.astro';
 const plate = 'key/schoolroom.webp';
+export const prerender = true;
 ---
 
 <Base
@@ -65,6 +67,10 @@ const plate = 'key/schoolroom.webp';
       @4estfilms <span aria-hidden="true">→</span>
     </a>
   </section>
+  <Notify
+    film="company"
+    heading="Know what comes next."
+  />
 </Base>
 
 <style>

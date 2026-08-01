@@ -2,8 +2,10 @@
 import Base from '../../layouts/Base.astro';
 import { strung } from '../../data/site';
 import stills from '../../data/strung-gallery.json';
+import Notify from '../../components/Notify.astro';
 
 const hero = stills.find((s) => s.file.includes('CI4q_yUgNeX')) ?? stills[0];
+export const prerender = true;
 ---
 
 <Base
@@ -117,6 +119,11 @@ const hero = stills.find((s) => s.file.includes('CI4q_yUgNeX')) ?? stills[0];
     </div>
     <p class="dim future" data-reveal style="--delay:200ms">{strung.future}</p>
   </section>
+  <Notify
+    film="strung"
+    heading="Follow the feature."
+    note="A feature-length Strung is in development. We will write when there is news."
+  />
 </Base>
 
 <style>

@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { company, strung, hnim, people } from '../data/site';
 import gallery from '../data/hnim-gallery.json';
+import Notify from '../components/Notify.astro';
 
 // A slow montage behind the title — one frame from each shoot day.
 const montage = [
@@ -10,6 +11,7 @@ const montage = [
   'key/portrait-woman.webp', 'key/two-men.webp', 'key/piano-boy.webp',
 ].map((file) => ({ file }));
 const title = 'Four est Films';
+export const prerender = true;
 ---
 
 <Base
@@ -138,6 +140,10 @@ const title = 'Four est Films';
       <a href="/about/" class="link">More about the company <span aria-hidden="true">→</span></a>
     </p>
   </section>
+  <Notify
+    film="company"
+    heading="Know what comes next."
+  />
 </Base>
 
 <style>

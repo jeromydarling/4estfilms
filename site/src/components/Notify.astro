@@ -1,0 +1,132 @@
+---
+interface Props {
+  film?: string;
+  heading?: string;
+  note?: string;
+}
+const {
+  film = '',
+  heading = 'Know when it opens.',
+  note = 'One email when there is something real to say. Nothing else, ever.',
+} = Astro.props;
+---
+
+<section class="notify">
+  <div class="wrap notify__inner">
+    <div>
+      <p class="eyebrow eyebrow--accent" data-reveal>Stay close</p>
+      <h2 class="h2" data-reveal>{heading}</h2>
+      <p class="dim notify__note" data-reveal style="--delay:120ms">{note}</p>
+    </div>
+
+    <form class="form" method="POST" action="/api/notify" data-reveal style="--delay:180ms">
+      <input type="hidden" name="film" value={film} />
+      <!-- honeypot: hidden from people, irresistible to bots -->
+      <div class="hp" aria-hidden="true">
+        <label>Company<input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+      </div>
+
+      <label class="sr" for="notify-email">Email address</label>
+      <div class="form__row">
+        <input
+          id="notify-email"
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          placeholder="you@example.com"
+          spellcheck="false"
+        />
+        <button type="submit">Notify me</button>
+      </div>
+      <p class="form__msg" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+
+<script>
+  for (const form of document.querySelectorAll<HTMLFormElement>('form.form')) {
+    const msg = form.querySelector<HTMLParagraphElement>('.form__msg')!;
+    const btn = form.querySelector<HTMLButtonElement>('button')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      btn.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Sending…';
+
+      try {
+        const res = await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(data)),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+
+        if (res.ok && body.ok) {
+          msg.dataset.state = 'ok';
+          msg.textContent = 'You’re on the list. Thank you.';
+          form.reset();
+        } else {
+          msg.dataset.state = 'err';
+          msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+        }
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .notify { border-top: 1px solid var(--rule); padding-block: clamp(4rem, 10vw, 8rem); }
+  .notify__inner {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .notify__note { margin-top: 1.2rem; max-width: 34ch; font-size: .95rem; }
+  @media (max-width: 860px) { .notify__inner { grid-template-columns: 1fr; } }
+
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .form__row { display: flex; gap: .6rem; flex-wrap: wrap; }
+  input[type='email'] {
+    flex: 1 1 16rem;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    color: var(--bone);
+    font-family: var(--display);
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    padding: .7rem .2rem;
+    transition: border-color .4s var(--ease);
+  }
+  input[type='email']::placeholder { color: var(--bone-faint); }
+  input[type='email']:focus { outline: 0; border-color: var(--accent); }
+
+  button {
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--bone);
+    font-family: var(--sans);
+    font-size: .74rem;
+    font-weight: 500;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    padding: .9rem 1.6rem;
+    cursor: pointer;
+    transition: border-color .4s var(--ease), color .4s var(--ease), background .4s var(--ease);
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: progress; }
+
+  .form__msg { font-size: .85rem; margin: 1rem 0 0; min-height: 1.3em; color: var(--bone-dim); }
+  .form__msg[data-state='ok'] { color: var(--accent); }
+  .form__msg[data-state='err'] { color: #d98080; }
+</style>

@@ -10,15 +10,62 @@ npm run dev      # localhost:4321
 npm run build    # → site/dist
 ```
 
-## Deploying to Cloudflare Pages
+## This is a Worker, not Pages
 
-Point Pages at this repo:
+Astro runs in SSR mode via `@astrojs/cloudflare`. Content pages carry
+`export const prerender = true` so they are still built to static HTML and
+served straight off the `ASSETS` binding — only the two API routes actually
+execute per request.
 
-| Setting | Value |
-|---|---|
-| Build command | `npm run build` |
-| Build output | `dist` |
-| Root directory | `site` |
+```bash
+npm run preview          # wrangler dev --local, real D1 + R2 bindings
+npm run deploy           # astro build && wrangler deploy
+npm run subscribers      # last 50 signups from production D1
+```
+
+Deploying needs a Cloudflare API token with **Workers Scripts: Edit**,
+**Workers R2 Storage: Edit**, **Workers KV Storage: Edit** and **D1: Edit**
+— plus **Zone → DNS: Edit** and **Zone → Workers Routes: Edit** if you bind
+`4estfilms.com`. Either `wrangler login` or:
+
+```bash
+export CLOUDFLARE_API_TOKEN=...
+export CLOUDFLARE_ACCOUNT_ID=...
+```
+
+### Bindings
+
+| Binding | Resource | Used by |
+|---|---|---|
+| `ASSETS` | `dist/client` | every static page |
+| `DB` | D1 `4estfilms-db` (`1e31040d-…`) | `/api/notify` |
+| `MEDIA` | R2 `4estfilms-media` | `/media/[...key]` |
+| `SESSION` | KV `4estfilms-sessions` | Astro sessions (adapter requirement) |
+
+Bindings are read via `import { env } from 'cloudflare:workers'` — Astro 7
+removed `Astro.locals.runtime.env`.
+
+### Routes that run server-side
+
+- **`POST /api/notify`** — mailing list signup. Lowercases and de-dupes by
+  email, honeypot field for bots, and returns an identical `{ok:true}`
+  whether the address is new or already present so the endpoint cannot be
+  used to test who is subscribed.
+- **`GET /media/[...key]`** — streams video out of R2 with full HTTP Range
+  support (including suffix ranges like `bytes=-500`), since without it
+  browsers cannot seek and Safari will not play at all. Falls back to an
+  extension-based content type because R2 only stores one if set at upload.
+
+### The mailing list
+
+Schema is in `migrations/0001_subscribers.sql`, already applied to
+production. The form appears on every page; `film` records which page the
+signup came from, so His Name is Michael interest is separable from general
+company interest.
+
+Nothing sends email yet — this only captures addresses. Wiring a provider
+(Resend, Postmark) is a later step, as is a double opt-in confirmation using
+the `confirmed_at` column that is already in the schema.
 
 ## Design
 

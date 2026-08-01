@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "4estfilms",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS"
+  },
+
+  "observability": { "enabled": true },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "4estfilms-db",
+      "database_id": "1e31040d-c133-453a-be75-469cb171024c"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "4estfilms-media"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "SESSION",
+      "id": "12f63d34dd4f4c428ec4415b22ede78d"
+    }
+  ]
+
+  // Bind the domain once 4estfilms.com is a zone on this account:
+  // "routes": [{ "pattern": "4estfilms.com", "custom_domain": true }]
+}

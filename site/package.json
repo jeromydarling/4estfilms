@@ -5,11 +5,19 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "wrangler dev --local",
+    "deploy": "astro build && wrangler deploy",
+    "migrate:local": "wrangler d1 execute 4estfilms-db --local --file migrations/0001_subscribers.sql",
+    "migrate:remote": "wrangler d1 execute 4estfilms-db --remote --file migrations/0001_subscribers.sql",
+    "subscribers": "wrangler d1 execute 4estfilms-db --remote --command \"SELECT created_at, email, film FROM subscribers ORDER BY id DESC LIMIT 50\""
   },
   "dependencies": {
-    "astro": "^5.2.5",
+    "@astrojs/cloudflare": "^14.1.7",
     "@fontsource-variable/fraunces": "^5.1.1",
-    "@fontsource-variable/inter": "^5.1.1"
+    "@fontsource-variable/inter": "^5.1.1",
+    "astro": "^7.1.6"
+  },
+  "devDependencies": {
+    "wrangler": "^4.118.0"
   }
 }
