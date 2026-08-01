@@ -96,11 +96,14 @@ understand, teach, and raise our own children with the love they deserve."*
 
 ### Detail
 
-Set in **Virginia City, Nevada, circa 1867**, shortly after the mining
-bonanza that made it the most important industrial city between Denver and
-San Francisco. Loosely based on **Father Patrick Manogue**, the only priest
-in the state, who earned a reputation as *"Wyatt Earp with a collar"* —
-feared by disreputable men, loved by everyone he helped.
+Set in **Virginia City, Nevada — across both 1867 and 1890**. 1867 is
+shortly after the mining bonanza that made it the most important
+industrial city between Denver and San Francisco. Loosely based on
+**Father Patrick Manogue**, the only priest in the state, who earned a
+reputation as *"Wyatt Earp with a collar"* — feared by disreputable men,
+loved by everyone he helped.
+
+**Releasing Winter 2026.**
 
 The film "seeks to answer a question: **what is your name?**"
 
@@ -197,15 +200,16 @@ like/comment counts, and local filenames.
 | [@strungfilm](https://instagram.com/strungfilm) | STRUNG | 209 | 26 | "{Lost in the forest of his own mind}" |
 | [@hnimfilm](https://instagram.com/hnimfilm) | His Name Is Michael \| Film | 168 | 16 | "1890 Western Movie Musical \| The only priest in Nevada battles demons & outlaws for the soul of a boy with no name. 🔜 @4estfilms" |
 
-### ⚠️ Two conflicts to resolve before writing copy
+### Settled (confirmed by the team, 2026-08-01)
 
-1. **1890 or 1867?** The IG bio says "1890 Western Movie Musical" and a
-   set report describes "a historically kept **1890** classroom." The old
-   hisnameismichael.live copy said "Virginia City, Nevada, **circa 1867**."
-   Pick one.
-2. **Release year.** A Dec 2023 post says "Coming to theatres 2024." The
-   current @4estfilms bio says "Coming 2026." 2026 is presumably right —
-   and it is now August 2026, so this is imminent. Confirm the date.
+1. **The film takes place in BOTH time periods — 1867 and 1890.** The
+   apparent conflict between the old site's "circa 1867" and the IG bio's
+   "1890" was not an error; the story spans both. Copy should say so
+   rather than picking one, and the two eras are a genuine design device:
+   the site can carry two distinct period palettes.
+2. **Release: Winter 2026.** Not 2024 (stale) and not just "2026." The
+   @4estfilms bio should be updated to match. This is a near-term release
+   — the site is launch collateral, not a placeholder.
 
 ### *Strung* — the real synopsis and credits
 
