@@ -36,6 +36,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       aria-hidden="true"
       style="--grain-url: url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22220%22 height=%22220%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.55%22/%3E%3C/svg%3E')"
     ></div>
+    <div class="scan" aria-hidden="true"></div>
     <div class="vignette" aria-hidden="true"></div>
 
     <a href="#main" class="sr">Skip to content</a>
@@ -92,8 +93,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
 </html>
 
 <style is:global>
-  html[data-world='forest'] { --accent: var(--moss); background: var(--forest-deep); }
+  /* Oxblood stays the accent everywhere — it is the house colour. What
+     changes per film is the ground it sits on, and a secondary tint used
+     for scrims and washes. */
+  html[data-world='forest'] { --tint: var(--moss); background: var(--forest-deep); }
   html[data-world='forest'] body { background: var(--forest-deep); }
-  html[data-world='frontier'] { --accent: var(--lantern); background: var(--night); }
+  html[data-world='frontier'] { --tint: var(--lantern); background: var(--night); }
   html[data-world='frontier'] body { background: var(--night); }
 </style>

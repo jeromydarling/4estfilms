@@ -35,23 +35,24 @@ export const prerender = true;
     <div class="hero__scrim" aria-hidden="true"></div>
 
     <div class="wrap hero__body">
-      <p class="eyebrow" data-reveal>{company.base} · Est. {company.since}</p>
-      <h1 class="display rise">
+      <p class="timecode hero__tc" data-reveal>REC · {company.base} · EST {company.since}</p>
+      <h1 class="hero__mark">
         <span class="sr">4est Films</span>
-        <span aria-hidden="true">
-          {[...'4est'].map((c, i) => <span style={`--i:${i}`}>{c}</span>)}
-        </span>
-        <span class="hero__films" aria-hidden="true">
-          {[...'Films'].map((c, i) => <span style={`--i:${i + 5}`}>{c}</span>)}
-        </span>
+        <img
+          src="/brand/4est-logo-bone.webp"
+          alt=""
+          width="1600"
+          height="1316"
+          fetchpriority="high"
+        />
       </h1>
-      <p class="lede hero__lede" data-reveal style="--delay:600ms">
+      <p class="lede hero__lede" data-reveal style="--delay:320ms">
         {company.tagline}.
       </p>
     </div>
 
     <div class="hero__foot wrap">
-      <span class="dim">Scroll</span>
+      <span class="timecode">Scroll</span>
       <span class="hero__line" aria-hidden="true"></span>
     </div>
   </section>
@@ -188,26 +189,30 @@ export const prerender = true;
       linear-gradient(to bottom, rgba(8,8,10,.72) 0%, rgba(8,8,10,.35) 45%, var(--ink) 100%);
   }
   .hero__body { position: relative; }
-  .display .hero__films {
-    display: block;
-    font-size: .3em;
-    letter-spacing: .34em;
-    text-transform: uppercase;
-    font-family: var(--sans);
-    font-weight: 400;
-    margin-top: 1.4rem;
-    opacity: .72;
+  .hero__tc { margin: 0 0 2rem; }
+  /* the drawn mark is the headline — no typographic stand-in beside it */
+  .hero__mark { margin: 0; line-height: 0; }
+  .hero__mark img {
+    width: min(60ch, 62vw);
+    max-width: 640px;
+    height: auto;
+    /* the mark resolves as the tape finishes seeking, echoing the sting */
+    animation: mark-in 1.4s var(--ease) both;
   }
-  .hero__lede { margin-top: 2.5rem; }
+  @keyframes mark-in {
+    from { opacity: 0; transform: translateY(1.2rem) scale(.99); filter: blur(6px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero__mark img { animation: none; }
+  }
+  .hero__lede { margin-top: 3rem; }
   .hero__foot {
     position: absolute;
     inset: auto 0 2.5rem;
     display: flex;
     align-items: center;
     gap: 1rem;
-    font-size: .7rem;
-    letter-spacing: .24em;
-    text-transform: uppercase;
   }
   .hero__line {
     height: 1px;

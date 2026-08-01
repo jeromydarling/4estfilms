@@ -12,8 +12,7 @@ const isHome = path === '/';
 
 <header class="nav">
   <a href="/" class="nav__mark" aria-label="4est Films — home">
-    <span class="nav__num">4</span><span class="nav__est">est</span>
-    <span class="nav__films">Films</span>
+    <img src="/brand/4est-logo-bone.webp" alt="4est Films" width="1600" height="1316" />
   </a>
 
   <nav aria-label="Primary">
@@ -43,25 +42,14 @@ const isHome = path === '/';
     mix-blend-mode: difference;
   }
 
-  .nav__mark {
-    display: inline-flex;
-    align-items: baseline;
-    gap: .1em;
-    text-decoration: none;
-    font-family: var(--display);
-    font-size: 1.35rem;
-    letter-spacing: -.02em;
-    color: #fff;
-  }
-  .nav__num { font-variation-settings: 'WONK' 1, 'opsz' 144; }
-  .nav__est { opacity: .75; }
-  .nav__films {
-    font-family: var(--sans);
-    font-size: .62rem;
-    letter-spacing: .3em;
-    text-transform: uppercase;
-    margin-left: .55em;
-    opacity: .6;
+  .nav__mark { display: block; line-height: 0; }
+  /* the drawn mark carries the identity; nothing should compete with it */
+  .nav__mark img {
+    width: auto;
+    height: clamp(2rem, 3.2vw, 2.9rem);
+    /* mix-blend-mode on the bar would invert the artwork, so the mark opts
+       out and keeps its own value */
+    mix-blend-mode: normal;
   }
 
   nav ul {
@@ -87,7 +75,7 @@ const isHome = path === '/';
 
   @media (max-width: 640px) {
     .nav { padding-block: 1rem; gap: 1rem; }
-    .nav__films { display: none; }
+    .nav__mark img { height: 1.9rem; }
     nav a { font-size: .62rem; letter-spacing: .12em; }
     nav ul { gap: 1.1rem; }
   }
