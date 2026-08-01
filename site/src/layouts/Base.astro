@@ -27,6 +27,20 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:site_name" content="4est Films" />
     <meta name="theme-color" content="#08080a" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    {/*
+      The scroll reveal hides everything it touches until an observer says
+      otherwise, which means a page whose script never arrives is a page with
+      no words on it. So the hidden state is opt-in — applied only once this
+      has run — and it expires on its own if the observer never shows up.
+    */}
+    <script is:inline>
+      (function () {
+        var d = document.documentElement;
+        d.dataset.js = '1';
+        setTimeout(function () { d.dataset.revealAll = '1'; }, 4000);
+      })();
+    </script>
   </head>
 
   <body>

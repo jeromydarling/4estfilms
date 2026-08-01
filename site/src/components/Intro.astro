@@ -5,21 +5,37 @@
 
 {/*
   Armed inline, before the hero paints, so the overlay never flashes in after
-  the page is already visible. Anything that should skip the intro — a repeat
-  view this session, reduced-motion, no JS — simply leaves it unarmed and the
-  hero shows immediately.
+  the page is already visible. Everything that should skip the intro — a
+  repeat view this session, reduced-motion, private mode, no JS at all —
+  leaves it unarmed, and CSS keeps it hidden unless it has been armed.
+
+  That default matters. This element covers the entire site at z-index
+  10000, so if it is visible before anything has committed to taking it
+  away, a browser that never runs the module below shows a black screen
+  and nothing else.
 */}
 <script is:inline>
   (function () {
+    var d = document.documentElement;
     try {
       if (sessionStorage.getItem('4est.intro') === 'seen') return;
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      document.documentElement.dataset.intro = 'armed';
-    } catch { /* private mode: just skip the intro */ }
+      d.dataset.intro = 'armed';
+      // The ceiling lives here, not in the module below, and that matters:
+      // the overlay covers the whole site, so whatever puts it away has to
+      // be code that is already running. If it waited on the module, a slow
+      // network or a throw anywhere in that bundle would leave a visitor
+      // staring at a black screen with no way past it.
+      setTimeout(function () { d.dataset.intro = 'over'; }, 6000);
+    } catch (e) {
+      // Private mode can throw on sessionStorage. Skip the intro rather
+      // than arm something we might not be able to disarm.
+      d.dataset.intro = 'over';
+    }
   })();
 </script>
 
-<div class="intro" data-intro-root hidden>
+<div class="intro" data-intro-root>
   <video
     class="intro__video"
     muted
@@ -47,16 +63,12 @@
     if (!armed) {
       root.remove();
     } else {
-      root.hidden = false;
-      document.documentElement.dataset.introPlaying = 'true';
-
       let done = false;
       const end = () => {
         if (done) return;
         done = true;
         try { sessionStorage.setItem('4est.intro', 'seen'); } catch {}
-        root.dataset.over = 'true';
-        delete document.documentElement.dataset.introPlaying;
+        document.documentElement.dataset.intro = 'over';
         // let the dissolve finish before the node leaves the tree
         setTimeout(() => root.remove(), 1200);
       };
@@ -65,9 +77,11 @@
       skip.addEventListener('click', end);
       // Esc should always get you out of a full-screen takeover
       addEventListener('keydown', (e) => { if (e.key === 'Escape') end(); });
-      // A stalled or undecodable file must not hold the page hostage
+      // A stalled or undecodable file must not hold the page hostage.
+      // Deliberately shorter than the inline ceiling, so in the normal case
+      // this is what ends the intro and the node gets cleaned up properly.
       video.addEventListener('error', end);
-      const guard = setTimeout(end, 7000);
+      const guard = setTimeout(end, 5000);
       video.addEventListener('ended', () => clearTimeout(guard));
 
       // Autoplay is permitted while muted, but if a policy still refuses,
@@ -79,16 +93,19 @@
 </script>
 
 <style>
+  /* Hidden by default and shown only once the inline armer has said so.
+     The overlay sits above the whole site, so "no JS yet" and "no JS at
+     all" both have to mean "not covering anything". */
   .intro {
+    display: none;
     position: fixed;
     inset: 0;
     z-index: 10000;
-    display: grid;
-    place-items: center;
     background: #000;
     transition: opacity 1s var(--ease);
   }
-  .intro[data-over='true'] {
+  :global(html[data-intro='armed']) .intro { display: block; }
+  :global(html[data-intro='over']) .intro {
     opacity: 0;
     pointer-events: none;
   }
@@ -125,7 +142,9 @@
 
 <style is:global>
   /* Hold the hero's own entrance until the sting clears, so the mark arrives
-     once rather than twice. */
-  html[data-intro-playing] .hero__mark img { animation-play-state: paused; }
-  html[data-intro-playing] { overflow: hidden; }
+     once rather than twice. Keyed on the same attribute as the overlay, so
+     the inline ceiling releases the scroll lock too — a page you cannot
+     scroll is its own kind of broken. */
+  html[data-intro='armed'] .hero__mark img { animation-play-state: paused; }
+  html[data-intro='armed'] { overflow: hidden; }
 </style>

@@ -189,13 +189,18 @@ p { max-width: var(--measure); }
 
 /* ── scroll reveal ──────────────────────────────────────── */
 
-[data-reveal] {
+/* Visible by default. The hidden state is scoped to html[data-js], which the
+   inline script in the head sets, so no-JS gets the content rather than an
+   empty page — and html[data-reveal-all], set by a timer in that same script,
+   forces everything back if the observer never runs. */
+html[data-js] [data-reveal] {
   opacity: 0;
   transform: translateY(2.2rem);
   transition: opacity 1.1s var(--ease), transform 1.1s var(--ease);
   transition-delay: var(--delay, 0ms);
 }
-[data-reveal].is-in { opacity: 1; transform: none; }
+html[data-js] [data-reveal].is-in,
+html[data-reveal-all] [data-reveal] { opacity: 1; transform: none; }
 
 /* letters that rise, one at a time */
 .rise > span {
