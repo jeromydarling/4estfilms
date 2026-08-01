@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+
+# Instagram video lives in R2 (bucket: 4estfilms-media), not in git.
+# Push it with scripts/upload-media-to-r2.sh. Earlier commits still hold
+# these files, so nothing is lost by untracking them.
+assets/instagram/**/*.mp4
+assets/instagram/**/*.mov

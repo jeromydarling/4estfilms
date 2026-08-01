@@ -1,0 +1,94 @@
+---
+import Base from '../layouts/Base.astro';
+import { company, people, strung, hnim } from '../data/site';
+import gallery from '../data/hnim-gallery.json';
+const plate = 'key/schoolroom.webp';
+---
+
+<Base
+  title="About — 4est Films"
+  description="4est Films is a Minneapolis film company founded by Joseph Bezenek, creating and collaborating with love since 2015."
+>
+  <section class="top wrap">
+    <p class="eyebrow" data-reveal>{company.legal} · {company.base}</p>
+    <h1 class="h2" data-reveal style="--delay:80ms">
+      Creating and collaborating<br />with love since {company.since}.
+    </h1>
+  </section>
+
+  <figure class="plate" data-parallax="0.05">
+    <img src={`/stills/${plate}`} alt="" loading="lazy" decoding="async" />
+  </figure>
+
+  <section class="section wrap prose">
+    <p class="lede" data-reveal>
+      A small company that keeps making things bigger than itself.
+    </p>
+    <p class="dim" data-reveal style="--delay:100ms">
+      4est Films was founded by Joseph Bezenek after years of work across Los
+      Angeles, London, Minnesota and Arizona — built to collaborate with the
+      artists he met along the way, and to only make work he is overwhelmingly
+      passionate about.
+    </p>
+    <p class="dim" data-reveal style="--delay:160ms">
+      The first film, <a href="/films/strung/">Strung</a>, was a debut for its
+      directors and for its nine-year-old lead. It won {strung.totalWins} awards
+      across {strung.festivalCount} festivals, and its premiere raised nearly
+      $15,000 for addiction treatment. The second,
+      <a href="/films/his-name-is-michael/">His Name is Michael</a>, is a western
+      musical shot over nine days in Nevada — the company's first feature,
+      arriving {hnim.release}.
+    </p>
+  </section>
+
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>The people</p>
+    <div class="people">
+      {people.map((p, i) => (
+        <article class="person" data-reveal style={`--delay:${i * 120}ms`}>
+          <h2 class="h3">{p.name}</h2>
+          <p class="eyebrow person__role">{p.roles}</p>
+          <p class="dim">{p.bio}</p>
+          <p class="person__links">
+            {p.site && <a href={p.site} class="link">Site</a>}
+            {p.imdb && <a href={p.imdb} class="link">IMDb</a>}
+          </p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section wrap contact">
+    <p class="eyebrow" data-reveal>Get in touch</p>
+    <h2 class="h2" data-reveal>Tell us what you're making.</h2>
+    <a href={company.instagram} class="link" data-reveal style="--delay:120ms">
+      @4estfilms <span aria-hidden="true">→</span>
+    </a>
+  </section>
+</Base>
+
+<style>
+  .top { padding-top: clamp(8rem, 18vw, 14rem); padding-bottom: clamp(2rem, 5vw, 4rem); }
+  .plate { margin: 0; height: clamp(18rem, 46vh, 34rem); overflow: hidden; }
+  .plate img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: translateY(var(--shift, 0)) scale(1.1);
+    filter: grayscale(.4) brightness(.7);
+  }
+  .prose .lede { margin-bottom: 2rem; }
+  .prose a { color: var(--accent); text-underline-offset: .25em; }
+
+  .people {
+    display: grid;
+    gap: clamp(2.5rem, 5vw, 4rem);
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    margin-top: 2.5rem;
+  }
+  .person { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+  .person__role { margin: .8rem 0 1rem; }
+  .person p { font-size: .95rem; }
+  .person__links { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
+
+  .contact { text-align: center; }
+  .contact .link { margin-top: 2rem; }
+</style>

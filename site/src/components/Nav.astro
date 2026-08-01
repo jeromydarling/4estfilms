@@ -1,0 +1,86 @@
+---
+const path = Astro.url.pathname;
+const links = [
+  ['/films/his-name-is-michael/', 'His Name is Michael'],
+  ['/films/strung/', 'Strung'],
+  ['/about/', 'About'],
+];
+const isHome = path === '/';
+---
+
+<header class="nav">
+  <a href="/" class="nav__mark" aria-label="4est Films — home">
+    <span class="nav__num">4</span><span class="nav__est">est</span>
+    <span class="nav__films">Films</span>
+  </a>
+
+  <nav aria-label="Primary">
+    <ul>
+      {links.map(([href, label]) => (
+        <li>
+          <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</header>
+
+<style>
+  .nav {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 1.4rem var(--pad);
+    mix-blend-mode: difference;
+  }
+
+  .nav__mark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .1em;
+    text-decoration: none;
+    font-family: var(--display);
+    font-size: 1.35rem;
+    letter-spacing: -.02em;
+    color: #fff;
+  }
+  .nav__num { font-variation-settings: 'WONK' 1, 'opsz' 144; }
+  .nav__est { opacity: .75; }
+  .nav__films {
+    font-family: var(--sans);
+    font-size: .62rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    margin-left: .55em;
+    opacity: .6;
+  }
+
+  nav ul {
+    display: flex;
+    gap: clamp(1rem, 3vw, 2.75rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav a {
+    text-decoration: none;
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    opacity: .62;
+    transition: opacity .4s var(--ease);
+  }
+  nav a:hover, nav a[aria-current='page'] { opacity: 1; }
+
+  @media (max-width: 640px) {
+    .nav { padding-block: 1rem; }
+    .nav__films { display: none; }
+    nav a { font-size: .6rem; letter-spacing: .14em; }
+  }
+</style>

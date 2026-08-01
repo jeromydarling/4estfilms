@@ -1,0 +1,229 @@
+---
+import Base from '../../layouts/Base.astro';
+import { strung } from '../../data/site';
+import stills from '../../data/strung-gallery.json';
+
+const hero = stills.find((s) => s.file.includes('CI4q_yUgNeX')) ?? stills[0];
+---
+
+<Base
+  world="forest"
+  title="Strung (2019) — 12-time award-winning short film from 4est Films"
+  description="Lost in the forest of his own mind, Eric must rely on a nine-year-old boy to battle withdrawal and break his family's cycle of addiction. Twelve wins across eight festivals."
+>
+  <!-- ── hero ── -->
+  <section class="hero">
+    <div class="hero__art" data-parallax="0.06">
+      <img src={`/stills/strung/${hero.file}`} alt="" loading="eager" decoding="async" />
+    </div>
+    <div class="hero__scrim" aria-hidden="true"></div>
+    <div class="wrap hero__body">
+      <p class="eyebrow eyebrow--accent" data-reveal>
+        {strung.year} · {strung.runtimeNote} · {strung.totalWins} awards
+      </p>
+      <h1 class="display" data-reveal style="--delay:80ms">Strung</h1>
+      <p class="lede hero__lede" data-reveal style="--delay:240ms">
+        Lost in the forest of his own mind.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── logline ── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>The story</p>
+    <p class="logline" data-reveal>{strung.logline}</p>
+    <p class="dim logline__note" data-reveal style="--delay:140ms">{strung.statement}</p>
+  </section>
+
+  <!-- ── three headlines ── -->
+  <section class="section wrap">
+    <div class="heads">
+      {strung.headlines.map((h, i) => (
+        <article class="head" data-reveal style={`--delay:${i * 140}ms`}>
+          <p class="head__stat">{h.stat}</p>
+          <p class="head__of">{h.of}</p>
+          <p class="dim">{h.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── awards ── -->
+  <section class="section wrap awards">
+    <div>
+      <p class="eyebrow" data-reveal>Selected honours</p>
+      <h2 class="h2" data-reveal>{strung.totalWins} wins<br />across {strung.festivalCount} festivals</h2>
+    </div>
+    <ul class="awards__list">
+      {strung.awards.map(([fest, prize, yr], i) => (
+        <li class="laurel" data-reveal style={`--delay:${i * 55}ms`}>
+          <span class="laurel__leaf" aria-hidden="true">❧</span>
+          <span class="laurel__name">{fest}</span>
+          <span class="laurel__prize">{prize} · {yr}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- ── stills ── -->
+  <section class="section">
+    <div class="wrap"><p class="eyebrow" data-reveal>Frames</p></div>
+    <div class="grid">
+      {stills.map((s, i) => (
+        <figure class="grid__cell" data-reveal style={`--delay:${(i % 4) * 70}ms`}>
+          <img src={`/stills/strung/${s.file}`} alt="Strung — film still" loading="lazy" decoding="async" />
+        </figure>
+      ))}
+    </div>
+    <p class="wrap dim credit">Stills by Forrest Wasko.</p>
+  </section>
+
+  <!-- ── credits ── -->
+  <section class="section wrap">
+    <div class="cols">
+      <div>
+        <p class="eyebrow" data-reveal>Directed by</p>
+        <ul class="plain" data-reveal>{strung.directors.map((d) => <li>{d}</li>)}</ul>
+        <p class="eyebrow" data-reveal style="--delay:80ms">Written by</p>
+        <ul class="plain" data-reveal style="--delay:80ms">{strung.writers.map((d) => <li>{d}</li>)}</ul>
+        <p class="eyebrow" data-reveal style="--delay:160ms">Produced by</p>
+        <ul class="plain" data-reveal style="--delay:160ms">{strung.producers.map((d) => <li>{d}</li>)}</ul>
+      </div>
+      <div>
+        <p class="eyebrow" data-reveal>Cast</p>
+        <ul class="plain" data-reveal>
+          {strung.cast.map(([who, role]) => (
+            <li>{who}{role ? <span class="dim"> — {role}</span> : null}</li>
+          ))}
+        </ul>
+        <p class="eyebrow" data-reveal style="--delay:120ms">Crew</p>
+        <ul class="plain" data-reveal style="--delay:120ms">
+          {strung.crew.map(([role, who]) => (
+            <li><span class="dim">{role} — </span>{who}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── the premiere / the point ── -->
+  <section class="section wrap give">
+    <p class="eyebrow eyebrow--accent" data-reveal>Why it was made</p>
+    <p class="lede give__lede" data-reveal>{strung.closing}</p>
+    <div class="help" data-reveal style="--delay:140ms">
+      <p class="help__label">{strung.helpline.label}</p>
+      <p class="help__num"><a href={strung.helpline.href}>{strung.helpline.number}</a></p>
+      <p class="dim help__note">{strung.helpline.note}</p>
+    </div>
+    <p class="dim future" data-reveal style="--delay:200ms">{strung.future}</p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    align-content: end;
+    padding-bottom: clamp(3rem, 9vw, 7rem);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero__art { position: absolute; inset: -10% 0; z-index: -2; }
+  .hero__art img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: translateY(var(--shift, 0)) scale(1.08);
+    filter: brightness(.46) saturate(.75) hue-rotate(-8deg);
+  }
+  .hero__scrim {
+    position: absolute; inset: 0; z-index: -1;
+    background:
+      linear-gradient(to bottom, rgba(13,23,18,.5), rgba(13,23,18,.22) 40%, var(--forest-deep) 96%),
+      radial-gradient(70% 55% at 25% 90%, rgba(74,107,82,.2), transparent 70%);
+  }
+  .hero__lede { margin-top: 2rem; }
+
+  .logline {
+    font-family: var(--display);
+    font-size: clamp(1.5rem, 3.4vw, 2.6rem);
+    line-height: 1.22;
+    font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 60;
+    max-width: 26ch;
+    margin: 1rem 0 0;
+  }
+  .logline__note { margin-top: 2rem; max-width: 46ch; font-size: .95rem; }
+
+  .heads {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .head { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+  .head__stat {
+    font-family: var(--display);
+    font-size: clamp(1.8rem, 3.6vw, 2.8rem);
+    line-height: 1;
+    margin: 0;
+    color: var(--accent);
+  }
+  .head__of {
+    font-size: .72rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--bone-faint);
+    margin: .7rem 0 1.2rem;
+  }
+  .head .dim { font-size: .93rem; }
+
+  .awards {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+  .awards__list { list-style: none; margin: 0; padding: 0; }
+  @media (max-width: 860px) { .awards { grid-template-columns: 1fr; } }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    gap: .5rem;
+    margin-top: 2rem;
+    padding-inline: .5rem;
+  }
+  .grid__cell { margin: 0; overflow: hidden; }
+  .grid__cell img {
+    width: 100%; aspect-ratio: 4 / 5; object-fit: cover;
+    filter: brightness(.82) saturate(.85);
+    transition: filter .6s var(--ease), transform .8s var(--ease);
+  }
+  .grid__cell:hover img { filter: none; transform: scale(1.05); }
+  .credit { margin-top: 1.5rem; font-size: .8rem; }
+
+  .cols {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .plain { list-style: none; margin: 0 0 2.2rem; padding: 0; }
+  .plain li {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .plain li .dim { font-family: var(--sans); font-size: .82rem; }
+
+  .give__lede { max-width: 40ch; margin-bottom: 3rem; }
+  .help {
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2.4rem);
+    max-width: 46ch;
+  }
+  .help__label { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bone-faint); margin: 0; }
+  .help__num { font-family: var(--display); font-size: clamp(1.8rem, 4vw, 2.6rem); margin: .5rem 0; }
+  .help__num a { text-decoration: none; color: var(--accent); }
+  .help__note { font-size: .9rem; margin: 0; }
+  .future { margin-top: 3rem; font-size: .9rem; }
+</style>
