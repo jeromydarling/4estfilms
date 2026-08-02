@@ -1,0 +1,314 @@
+---
+import Base from '../../layouts/Base.astro';
+import { hnim } from '../../data/site';
+import { screenings } from '../../lib/screenings';
+export const prerender = true;
+---
+
+<Base
+  world="frontier"
+  title="Bring His Name is Michael to your city — 4est Films"
+  description="Ask for a screening of His Name is Michael where you live. When enough people in one city ask, we find a screen — and if you want to organise it, we hand you the venues and the letter."
+  ogImage="/og/hnim.jpg"
+  ogImageAlt="Bring His Name is Michael to your city"
+>
+  <section class="top wrap">
+    <p class="eyebrow eyebrow--accent" data-reveal>Community screenings</p>
+    <h1 class="h2 top__title" data-reveal style="--delay:60ms">
+      Bring it to your city.
+    </h1>
+    <p class="lede top__lede" data-reveal style="--delay:140ms">
+      <em>{hnim.title}</em> will play in cities where people ask for it.
+    </p>
+    <p class="dim top__note" data-reveal style="--delay:200ms">
+      Put your city on the map. When {screenings.threshold} people there have
+      asked, we go looking for a screen. If you want to be the one who
+      organises it, say so — and we will hand you a shortlist of venues worth
+      approaching and a letter to send them, with your city's numbers already
+      in it.
+    </p>
+  </section>
+
+  <section class="section wrap ask">
+    <form class="ask__form" data-ask>
+      <div class="hp" aria-hidden="true">
+        <input type="text" name="hp_url" tabindex="-1" autocomplete="off" />
+      </div>
+
+      <label class="ask__label" for="sc-city">Your city</label>
+      <input
+        id="sc-city"
+        name="city"
+        type="text"
+        required
+        autocomplete="address-level2"
+        placeholder="Sioux Falls, SD"
+        class="ask__city"
+      />
+
+      <div class="ask__row">
+        <div>
+          <label class="ask__label" for="sc-name">First name <span class="dim">(optional)</span></label>
+          <input id="sc-name" name="first_name" type="text" autocomplete="given-name" placeholder="First name" />
+        </div>
+        <div>
+          <label class="ask__label" for="sc-email">Email</label>
+          <input id="sc-email" name="email" type="email" required autocomplete="email"
+                 placeholder="you@example.com" spellcheck="false" />
+        </div>
+      </div>
+
+      <!-- The whole feature turns on this checkbox, so it is not buried in
+           a footnote — a city with a host is a city that happens. -->
+      <label class="ask__host">
+        <input type="checkbox" name="willing_to_host" />
+        <span>
+          <strong>I'd help organise it.</strong>
+          <span class="dim">You'd get the venue shortlist, the letter to send them, and us on the other end of an email.</span>
+        </span>
+      </label>
+
+      <button class="ask__go" type="submit">Ask for a screening</button>
+      <p class="ask__msg" role="status" aria-live="polite"></p>
+    </form>
+
+    <aside class="ask__side">
+      <p class="eyebrow" data-reveal>How it works</p>
+      <ol class="steps" data-reveal>
+        <li><span>1</span> You ask, and your city gets a page with a live count.</li>
+        <li><span>2</span> You send that page to anyone else who would come.</li>
+        <li><span>3</span> At {screenings.threshold}, we work the city with whoever volunteered.</li>
+        <li><span>4</span> Tickets go on sale, and the screening pays for itself.</li>
+      </ol>
+      <p class="dim steps__note" data-reveal>
+        No money changes hands to ask. Nothing is booked until there is a
+        date and a venue that has said yes.
+      </p>
+    </aside>
+  </section>
+
+  <section class="section wrap board">
+    <div class="board__head">
+      <p class="eyebrow" data-reveal>Where it stands</p>
+      <h2 class="h2" data-reveal>Cities asking</h2>
+    </div>
+    <div data-board>
+      <p class="dim board__empty">Loading…</p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { capture, read, track } from '../../lib/attribution';
+
+  capture();
+
+  const board = document.querySelector<HTMLElement>('[data-board]');
+  const bar = (n: number, threshold: number) => {
+    const pct = Math.max(0, Math.min(1, n / threshold)) * 100;
+    return `<span class="row__bar"><span style="width:${pct}%"></span></span>`;
+  };
+
+  async function paint() {
+    if (!board) return;
+    try {
+      const res = await fetch('/api/screenings/top');
+      const d = (await res.json()) as {
+        ok?: boolean;
+        threshold: number;
+        cities: { slug: string; city: string; region: string | null; country: string; requests: number; hosts: number }[];
+        totals: { cities: number; requests: number };
+      };
+      if (!d.ok || !d.cities.length) {
+        board.innerHTML =
+          '<p class="dim board__empty">No city has asked yet. Yours can be the first.</p>';
+        return;
+      }
+      const label = (c: { city: string; region: string | null; country: string }) =>
+        [c.city, c.region, c.country !== 'US' ? c.country : null].filter(Boolean).join(', ');
+
+      board.innerHTML = `
+        <p class="dim board__total">${d.totals.requests} ${d.totals.requests === 1 ? 'person' : 'people'} across ${d.totals.cities} ${d.totals.cities === 1 ? 'city' : 'cities'}.</p>
+        <ol class="rows">
+          ${d.cities
+            .map(
+              (c) => `<li class="row">
+                <a href="/screenings/${c.slug}/">
+                  <span class="row__city">${label(c)}</span>
+                  ${bar(c.requests, d.threshold)}
+                  <span class="row__n">${c.requests}<span class="dim">/${d.threshold}</span></span>
+                </a>
+                ${c.hosts ? '<span class="row__host">host ready</span>' : ''}
+              </li>`
+            )
+            .join('')}
+        </ol>`;
+    } catch {
+      board.innerHTML = '<p class="dim board__empty">Could not load the list just now.</p>';
+    }
+  }
+  void paint();
+
+  const form = document.querySelector<HTMLFormElement>('[data-ask]');
+  if (form) {
+    const msg = form.querySelector<HTMLParagraphElement>('.ask__msg')!;
+    const go = form.querySelector<HTMLButtonElement>('.ask__go')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Adding your city…';
+
+      try {
+        const res = await fetch('/api/screenings/request', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            ...data,
+            willing_to_host: form.querySelector<HTMLInputElement>('[name=willing_to_host]')!.checked,
+            ...read(),
+          }),
+        });
+        const b = (await res.json()) as {
+          ok?: boolean; error?: string; slug?: string; label?: string;
+          requests?: number; needs_confirm?: boolean;
+        };
+
+        if (b.ok && b.slug) {
+          track('screening_request');
+          msg.dataset.state = 'ok';
+          msg.textContent = b.needs_confirm
+            ? `Check your email to confirm — then ${b.label} is on the map.`
+            : `${b.label} is on the map. Taking you there…`;
+          form.reset();
+          void paint();
+          setTimeout(() => { location.href = `/screenings/${b.slug}/`; }, 1400);
+          return;
+        }
+        msg.dataset.state = 'err';
+        msg.textContent = b.error ?? 'That didn’t go through. Try again?';
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        go.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .top { padding-top: clamp(7rem, 16vw, 12rem); padding-bottom: clamp(1rem, 3vw, 2rem); }
+  .top__title { max-width: 16ch; }
+  .top__lede { margin-top: 1.6rem; max-width: 30ch; }
+  .top__lede em { font-style: italic; }
+  .top__note { margin-top: 1.6rem; max-width: 52ch; font-size: .96rem; }
+
+  .ask {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+    align-items: start;
+  }
+  @media (max-width: 900px) { .ask { grid-template-columns: 1fr; } }
+
+  .ask__form { border: 1px solid var(--rule); padding: clamp(1.5rem, 4vw, 2.6rem); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .ask__label {
+    display: block;
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-faint); margin-bottom: .5rem;
+  }
+  .ask__form input[type='text'],
+  .ask__form input[type='email'] {
+    width: 100%; background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.1rem; padding: .6rem .2rem;
+    transition: border-color .4s var(--ease); min-width: 0;
+  }
+  .ask__city { font-size: 1.35rem !important; }
+  .ask__form input::placeholder { color: var(--bone-faint); }
+  .ask__form input:focus { outline: 0; border-color: var(--blood-lift); }
+  .ask__row {
+    display: grid; grid-template-columns: 1fr 1.4fr; gap: 1rem 1.2rem; margin-top: 1.6rem;
+  }
+  @media (max-width: 520px) { .ask__row { grid-template-columns: 1fr; } }
+
+  .ask__host {
+    display: flex; gap: .8rem; align-items: start;
+    margin-top: 2rem; padding: 1.1rem 1.2rem;
+    border: 1px solid var(--rule); cursor: pointer;
+    transition: border-color .3s var(--ease);
+  }
+  .ask__host:hover { border-color: var(--bone-faint); }
+  .ask__host input { margin-top: .25rem; accent-color: var(--accent); flex: none; }
+  .ask__host span { font-size: .9rem; line-height: 1.5; }
+  .ask__host strong { display: block; font-weight: 600; }
+  .ask__host .dim { display: block; margin-top: .2rem; font-size: .85rem; }
+
+  .ask__go {
+    width: 100%; margin-top: 1.6rem;
+    background: var(--accent); border: 1px solid var(--accent); color: #fff;
+    font-family: var(--sans); font-size: .74rem; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase; padding: 1rem 1.4rem;
+    cursor: pointer; transition: filter .3s var(--ease);
+  }
+  .ask__go:hover:not(:disabled) { filter: brightness(1.2); }
+  .ask__go:disabled { opacity: .5; cursor: progress; }
+  .ask__msg { font-size: .88rem; margin: 1rem 0 0; min-height: 1.2em; color: var(--bone-dim); }
+  .ask__msg[data-state='ok'] { color: var(--blood-lift); }
+  .ask__msg[data-state='err'] { color: #d98080; }
+
+  .steps { list-style: none; margin: 1.5rem 0 0; padding: 0; counter-reset: s; }
+  .steps li {
+    display: grid; grid-template-columns: 2rem 1fr; gap: .9rem;
+    padding: .9rem 0; border-bottom: 1px solid var(--rule);
+    font-size: .93rem; color: var(--bone-dim);
+  }
+  .steps li span {
+    font-family: var(--mono); font-size: .7rem; color: var(--blood-lift);
+    padding-top: .25rem;
+  }
+  .steps__note { margin-top: 1.4rem; font-size: .86rem; }
+
+  .board__head { margin-bottom: 2rem; }
+</style>
+
+<!-- The board is injected by script, and injected nodes never carry Astro's
+     scoping attribute — scoped rules simply would not match them, which is
+     why this list rendered as bare bullets the first time. Global, but
+     namespaced under [data-board] so it stays this component's. -->
+<style is:global>
+  [data-board] .board__empty,
+  [data-board] .board__total { font-size: .95rem; color: var(--bone-dim); }
+  [data-board] .rows { list-style: none; margin: 1.5rem 0 0; padding: 0; }
+  [data-board] .row { border-bottom: 1px solid var(--rule); position: relative; }
+  [data-board] .row a {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto;
+    align-items: center; gap: 1rem 1.5rem;
+    padding: 1.1rem 0; text-decoration: none; color: inherit;
+  }
+  @media (max-width: 640px) {
+    [data-board] .row a { grid-template-columns: 1fr auto; }
+    [data-board] .row__bar { grid-column: 1 / -1; order: 3; }
+  }
+  [data-board] .row a:hover .row__city { color: var(--blood-lift); }
+  [data-board] .row__city {
+    font-family: var(--display); font-size: 1.15rem;
+    transition: color .3s var(--ease);
+  }
+  [data-board] .row__bar { display: block; height: 2px; background: var(--rule); }
+  [data-board] .row__bar span { display: block; height: 100%; background: var(--accent); }
+  [data-board] .row__n {
+    font-family: var(--mono); font-size: .78rem; letter-spacing: .1em;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  [data-board] .row__host {
+    position: absolute; right: 0; bottom: .25rem;
+    font-family: var(--mono); font-size: .56rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--lantern);
+  }
+</style>

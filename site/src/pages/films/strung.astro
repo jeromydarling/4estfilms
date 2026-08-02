@@ -6,11 +6,16 @@ import Notify from '../../components/Notify.astro';
 import YouTube from '../../components/YouTube.astro';
 
 // The old "Frames" grid was mostly trailer title cards, quote graphics and a
-// unit photo of the crew in modern clothes. Of the seven images we hold, one
-// is an actual frame from the film — it is the hero below. The rest of the
-// grid comes back when the full-resolution stills arrive; until then the page
-// shows the two pieces of official key art rather than padding.
-const hero = '2020-12-17_CI4q_yUgNeX_01.jpg';
+// unit photo of the crew in modern clothes. The rest of the grid comes back
+// when the full-resolution stills arrive; until then the page shows the
+// official key art rather than padding.
+//
+// The hero is Eric, cropped out of the clean half of a quote card — the only
+// photograph of him we hold. It is 507x903, which is why the hero is a split
+// rather than a full bleed: at this size the face is sharp, and stretched
+// across a 1440px viewport it stops reading as a face at all. Swap to a
+// full-bleed treatment the day the original frame turns up.
+const hero = 'eric-portrait.webp';
 const poster = '2020-12-21_CJE3HIjg9Lx_01.jpg';
 export const prerender = true;
 ---
@@ -25,18 +30,28 @@ export const prerender = true;
 >
   <!-- ── hero ── -->
   <section class="hero">
-    <div class="hero__art" data-parallax="0.06">
-      <img src={`/stills/strung/${hero}`} alt="" loading="eager" decoding="async" />
-    </div>
-    <div class="hero__scrim" aria-hidden="true"></div>
-    <div class="wrap hero__body">
-      <p class="eyebrow eyebrow--accent" data-reveal>
-        {strung.year} · {strung.runtimeNote} · {strung.totalWins} awards
-      </p>
-      <h1 class="display" data-reveal style="--delay:80ms">Strung</h1>
-      <p class="lede hero__lede" data-reveal style="--delay:240ms">
-        Lost in the forest of his own mind.
-      </p>
+    <div class="hero__glow" aria-hidden="true"></div>
+    <div class="wrap hero__inner">
+      <figure class="hero__plate">
+        <img
+          src={`/stills/strung/${hero}`}
+          alt="Jeromy Darling as Eric"
+          width="507"
+          height="903"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
+        />
+      </figure>
+      <div class="hero__body">
+        <p class="eyebrow eyebrow--accent" data-reveal>
+          {strung.year} · {strung.runtimeNote} · {strung.totalWins} awards
+        </p>
+        <h1 class="display hero__title" data-reveal style="--delay:80ms">Strung</h1>
+        <p class="lede hero__lede" data-reveal style="--delay:240ms">
+          Lost in the forest of his own mind.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -174,29 +189,62 @@ export const prerender = true;
 </Base>
 
 <style>
+  /* A split rather than a full bleed. The only photograph of Eric we hold is
+     507px wide, and this shows it at roughly native size — stretched behind
+     the title it stops reading as a face. */
   .hero {
     position: relative;
     min-height: 100svh;
     display: grid;
-    align-content: end;
-    padding-bottom: clamp(3rem, 9vw, 7rem);
+    align-content: center;
+    padding-block: clamp(6rem, 11vw, 8rem) clamp(3rem, 7vw, 5rem);
     overflow: hidden;
     isolation: isolate;
   }
-  .hero__art { position: absolute; inset: -10% 0; z-index: -2; }
-  .hero__art img {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    transform: translateY(var(--shift, 0)) scale(1.08);
-    filter: brightness(.46) saturate(.75) hue-rotate(-8deg);
-  }
-  .hero__scrim {
+  .hero__glow {
     position: absolute; inset: 0; z-index: -1;
     background:
-      linear-gradient(to bottom, rgba(13,23,18,.5), rgba(13,23,18,.22) 40%, var(--forest-deep) 96%),
-      radial-gradient(70% 55% at 25% 90%, rgba(74,107,82,.2), transparent 70%);
+      radial-gradient(58% 62% at 22% 48%, rgba(74,107,82,.18), transparent 72%),
+      radial-gradient(70% 50% at 80% 88%, rgba(13,23,18,.9), transparent 70%);
   }
+  .hero__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4.5rem);
+  }
+  .hero__plate {
+    margin: 0;
+    /* Sized by height so the whole face is always above the fold on a short
+       laptop, and capped at the file's own dimensions — upscaling this is
+       the entire thing being avoided. */
+    height: min(64svh, 903px);
+    aspect-ratio: 507 / 903;
+    max-width: min(100%, 507px);
+    overflow: hidden;
+    transform: translateY(var(--shift, 0));
+  }
+  .hero__plate img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: brightness(.88) saturate(.92);
+    animation: plate-in 1.6s var(--ease) both;
+  }
+  @keyframes plate-in {
+    from { opacity: 0; transform: scale(1.04); filter: brightness(.5) saturate(.6); }
+    to   { opacity: 1; transform: none; filter: brightness(.88) saturate(.92); }
+  }
+  @media (prefers-reduced-motion: reduce) { .hero__plate img { animation: none; } }
+  .hero__title { font-size: clamp(3rem, 8.5vw, 8rem); }
   .hero__lede { margin-top: 2rem; }
+
+  @media (max-width: 860px) {
+    .hero { align-content: end; }
+    .hero__inner { grid-template-columns: 1fr; gap: 2rem; }
+    /* The face leads on a phone too, just smaller — a portrait at full
+       column width would push the title off the fold. */
+    .hero__plate { height: min(46svh, 903px); max-width: min(62vw, 300px); }
+  }
 
   .logline {
     font-family: var(--display);
