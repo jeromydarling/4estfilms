@@ -1,0 +1,200 @@
+---
+import { known } from '../lib/known';
+import { dollars } from '../lib/premiere';
+
+interface Props {
+  /** Button label. The default is the framing we use everywhere. */
+  cta?: string;
+  /** Shown above the amounts. */
+  label?: string;
+}
+const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
+---
+
+{/*
+  The gift form, used on the home page and on /known/.
+
+  One component rather than two copies because the amounts, the ceiling and
+  the wording are the sort of thing that gets changed in a hurry, and a second
+  copy is the one that gets missed. The script below is bundled once by Astro
+  and binds every instance on the page.
+
+  Checkout is a redirect to Stripe rather than Stripe's embedded form: the
+  embed needs a publishable key we have not been given, and this is already
+  two clicks — pick an amount, go.
+*/}
+{known.open ? (
+  <form class="gift" data-gift>
+    <p class="gift__label">{label}</p>
+    <div class="gift__amounts">
+      {known.suggestedCents.map((c) => (
+        <button
+          type="button"
+          class="gift__amount"
+          data-amount={c}
+          aria-pressed={c === known.defaultCents ? 'true' : 'false'}
+        >{dollars(c)}</button>
+      ))}
+    </div>
+    <label class="gift__other">
+      <span class="sr">Another amount, in dollars</span>
+      <span class="gift__sign" aria-hidden="true">$</span>
+      <input
+        type="number"
+        name="other"
+        min={known.minimumCents / 100}
+        max={known.maximumCents / 100}
+        step="1"
+        inputmode="numeric"
+        placeholder="Another amount"
+      />
+    </label>
+    <button class="gift__go" type="submit">{cta}</button>
+    <p class="gift__msg" role="status" aria-live="polite"></p>
+    <p class="dim gift__fine">
+      Minimum {dollars(known.minimumCents)}, so card fees don’t eat the gift.
+      Stripe emails your receipt; we never see your card.
+    </p>
+  </form>
+) : (
+  <div class="soon">
+    <p class="eyebrow eyebrow--accent">Not yet</p>
+    <p class="soon__lede">Giving opens shortly.</p>
+    <p class="dim">
+      Put your address in anywhere on the site and you’ll hear when it does.
+    </p>
+  </div>
+)}
+
+<script>
+  import { read, track } from '../lib/attribution';
+
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-gift]')) {
+    const buttons = [...form.querySelectorAll<HTMLButtonElement>('.gift__amount')];
+    const other = form.querySelector<HTMLInputElement>('input[name=other]')!;
+    const go = form.querySelector<HTMLButtonElement>('.gift__go')!;
+    const msg = form.querySelector<HTMLParagraphElement>('.gift__msg')!;
+
+    let cents = Number(
+      buttons.find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset.amount ?? 5000
+    );
+
+    const select = (b: HTMLButtonElement | null) => {
+      for (const x of buttons) x.setAttribute('aria-pressed', String(x === b));
+    };
+
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        cents = Number(b.dataset.amount);
+        other.value = '';
+        select(b);
+      });
+    }
+    // Typing an amount deselects the presets, so what is charged is always
+    // the thing that looks selected.
+    other.addEventListener('input', () => {
+      const v = Number(other.value);
+      if (Number.isFinite(v) && v > 0) {
+        cents = Math.round(v * 100);
+        select(null);
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Opening checkout…';
+
+      try {
+        const attr = read();
+        track('known_give_start');
+        const res = await fetch('/api/known/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            amount_cents: cents,
+            utm_source: attr.utm_source,
+            utm_campaign: attr.utm_campaign,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as
+          { ok?: boolean; url?: string; error?: string };
+        if (body.ok && body.url) {
+          location.href = body.url;
+          return;
+        }
+        msg.dataset.state = 'err';
+        msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        go.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .gift__label {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-faint); margin: 0 0 1.2rem;
+  }
+  /* A grid, not wrapping flex: with four chips the last one wrapped onto a
+     row of its own on a phone and read as a different kind of button. */
+  .gift__amounts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5rem;
+    margin-bottom: .8rem;
+  }
+  @media (max-width: 520px) {
+    .gift__amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .gift__amount {
+    background: transparent; border: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.15rem; padding: .8rem .4rem;
+    cursor: pointer;
+    transition: border-color .3s var(--ease), color .3s var(--ease),
+                transform .3s var(--ease);
+  }
+  .gift__amount[aria-pressed='true'] { border-color: var(--accent); color: var(--blood-lift); }
+  .gift__amount:hover { border-color: var(--bone-faint); transform: translateY(-2px); }
+
+  .gift__other { display: flex; align-items: baseline; gap: .4rem; }
+  .gift__sign { font-family: var(--display); color: var(--bone-faint); }
+  .gift input {
+    width: 100%; background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.05rem; padding: .6rem .2rem;
+    transition: border-color .4s var(--ease); min-width: 0;
+  }
+  .gift input::placeholder { color: var(--bone-faint); }
+  .gift input:focus { outline: 0; border-color: var(--blood-lift); }
+
+  .gift__go {
+    width: 100%; margin-top: 1.8rem;
+    background: var(--accent); border: 1px solid var(--accent); color: #fff;
+    font-family: var(--sans); font-size: .74rem; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase; padding: 1rem 1.4rem;
+    cursor: pointer;
+    transition: filter .3s var(--ease), transform .3s var(--ease);
+  }
+  .gift__go:hover:not(:disabled) { filter: brightness(1.2); transform: translateY(-2px); }
+  .gift__go:disabled { opacity: .5; cursor: progress; transform: none; }
+  .gift__msg { font-size: .85rem; margin: .9rem 0 0; min-height: 1.2em; color: var(--bone-dim); }
+  .gift__msg[data-state='err'] { color: #d98080; }
+  .gift__fine { font-size: .8rem; margin-top: 1.1rem; }
+
+  .soon__lede {
+    font-family: var(--display); font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+    line-height: 1.2; margin: 0 0 1.2rem;
+  }
+  .soon .dim { font-size: .95rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gift__amount, .gift__go { transition: none; }
+    .gift__amount:hover, .gift__go:hover:not(:disabled) { transform: none; }
+  }
+</style>
