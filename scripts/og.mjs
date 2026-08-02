@@ -68,9 +68,12 @@ const CARDS = {
     sub: 'Created through collaboration',
   },
   press: {
-    // Not the schoolroom wide — one of the children is in a modern jersey.
-    plate: 'stills/hnim/day7_DSC04453.webp',
-    tone: 'rgba(8,8,10,.6)',
+    // The lead, since the kit now leads with him. Not the schoolroom wide —
+    // that is the wrap photo, with a crew member in a modern jersey in it.
+    plate: 'press/hnim/hnim-d4_DSC03663.webp',
+    focus: '58% 40%',
+    dim: 0.62,
+    tone: 'rgba(8,8,10,.62)',
     kicker: 'Press',
     title: 'Press kit',
     sub: 'Loglines, credits, stills and contact for both films',
