@@ -11,9 +11,37 @@
  */
 
 export const known = {
-  name: 'Known',
+  name: 'KNOWN',
+  /** KNOWN's own site. The organisation is larger than this donation flow. */
+  site: 'https://iamknown.live',
   /** Set to false to close giving; the page explains itself either way. */
   open: true,
+
+  /** The mission, as the company states it. Rendered as a stack, not prose. */
+  mission: [
+    'To create films that move people.',
+    'Films that challenge.',
+    'Films that restore hope.',
+    'Films that stay with audiences long after the credits roll.',
+  ],
+
+  /**
+   * What a supporter gets. Kept as data so donor tiers can be added without
+   * touching the markup — a third group slots in here and renders itself.
+   */
+  recognition: {
+    every: [
+      'Their name listed in the Special Thanks section of our film credits',
+      'Recognition as a supporter of independent filmmaking',
+      'Updates throughout production on the projects they’re helping bring to life',
+    ],
+    major: [
+      'Invitations to visit the set during production (when applicable)',
+      'Behind-the-scenes access',
+      'Opportunities to meet cast and crew',
+      'Early updates and exclusive production content',
+    ],
+  },
 
   /** What the money makes. Ordered as the company says it. */
   disciplines: [

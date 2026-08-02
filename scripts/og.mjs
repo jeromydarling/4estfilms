@@ -68,14 +68,14 @@ const CARDS = {
     sub: 'Created through collaboration',
   },
   known: {
-    // The company, not a film — Known funds all three disciplines, so the
-    // plate is the people rather than any one picture.
+    // The organisation, not a film — KNOWN funds all three disciplines, so
+    // the plate is the people rather than any one picture.
     plate: 'stills/key/two-men.webp',
     dim: 0.5,
     tone: 'rgba(8,8,10,.7)',
     kicker: 'The non-profit arm of 4est Films',
-    title: 'Known',
-    sub: 'Commission the beautiful thing',
+    title: 'KNOWN',
+    sub: 'Become part of the story',
   },
   press: {
     // The lead, since the kit now leads with him. Not the schoolroom wide —

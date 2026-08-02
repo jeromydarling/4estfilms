@@ -5,6 +5,7 @@ import { organization, website } from '../data/schema';
 import Notify from '../components/Notify.astro';
 import Trailer from '../components/Trailer.astro';
 import Intro from '../components/Intro.astro';
+import Support from '../components/Support.astro';
 
 // A slow montage behind the title — one frame from each shoot day.
 const montage = [
@@ -153,6 +154,10 @@ export const prerender = true;
       <a href="/about/" class="link">More about the company <span aria-hidden="true">→</span></a>
     </p>
   </section>
+
+  <!-- ── support the mission ──────────────────────────────── -->
+  <Support />
+
   <Notify
     film="company"
     heading="Know what comes next."
