@@ -2,7 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import { company, strung, hnim, people } from '../../data/site';
 import { organization, strungSchema, hnimSchema } from '../../data/schema';
-import { pressContact, pressStills } from '../../data/press';
+import { pressContact, pressStills, stillGroups } from '../../data/press';
 export const prerender = true;
 ---
 
@@ -107,7 +107,7 @@ export const prerender = true;
     </div>
   </section>
 
-  <!-- ── stills ── -->
+  <!-- ── stills ── grouped, and the lead leads ── -->
   <section class="section">
     <div class="wrap">
       <p class="eyebrow" data-reveal>Stills</p>
@@ -118,15 +118,29 @@ export const prerender = true;
         Print resolution on request. Behind-the-scenes photography by Ryan McBoyle.
       </p>
     </div>
-    <div class="grid">
-      {pressStills.map((s, i) => (
-        <figure class="grid__cell" data-reveal style={`--delay:${(i % 5) * 60}ms`}>
-          <a href={s.src} download>
-            <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
-          </a>
-        </figure>
-      ))}
-    </div>
+
+    {stillGroups.map((g) => {
+      const shots = pressStills.filter((s) => s.group === g.key);
+      if (!shots.length) return null;
+      return (
+        <div class="set">
+          <div class="wrap set__head">
+            <h3 class="h3">{g.label}</h3>
+            <p class="dim set__note">{g.note}</p>
+            <p class="set__count">{shots.length}</p>
+          </div>
+          <div class="grid">
+            {shots.map((s, i) => (
+              <figure class="grid__cell" data-reveal style={`--delay:${(i % 5) * 60}ms`}>
+                <a href={s.src} download>
+                  <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
+                </a>
+              </figure>
+            ))}
+          </div>
+        </div>
+      );
+    })}
   </section>
 
   <!-- ── people ── -->
@@ -218,6 +232,22 @@ export const prerender = true;
   .credits dd { margin: 0; font-family: var(--display); font-size: 1.05rem; }
 
   .stills__note { margin-top: 1.2rem; max-width: 56ch; font-size: .95rem; }
+
+  .set { margin-top: clamp(2.5rem, 6vw, 4rem); }
+  .set__head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: .4rem 1.5rem;
+    border-top: 1px solid var(--rule);
+    padding-top: 1.4rem;
+  }
+  .set__note { grid-column: 1; margin: 0; font-size: .9rem; max-width: 52ch; }
+  .set__count {
+    grid-column: 2; grid-row: 1;
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .18em;
+    color: var(--bone-faint); margin: 0;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
