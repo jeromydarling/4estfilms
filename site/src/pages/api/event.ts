@@ -17,6 +17,10 @@ const NAMES = new Set([
   'track_start',
   'track_complete',
   'screening_request',
+  // Fired when somebody sends themselves to Stripe from the Known page. The
+  // gift itself is recorded by the webhook; this is the other half of the
+  // pair, and the gap between them is the checkout drop-off.
+  'known_give_start',
 ]);
 
 const str = (v: unknown, max: number) =>

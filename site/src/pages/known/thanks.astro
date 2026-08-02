@@ -1,0 +1,45 @@
+---
+import Base from '../../layouts/Base.astro';
+import { known } from '../../lib/known';
+export const prerender = true;
+---
+
+<Base
+  title="Thank you — Known"
+  description="Your gift to Known."
+  ogImage="/og/known.jpg"
+  ogImageAlt="Known — the non-profit arm of 4est Films"
+>
+  {/*
+    Deliberately says nothing about the amount. The success URL carries a
+    session id anyone could invent, so this page treats it as decoration and
+    never as proof of payment — the webhook is the only thing that records a
+    gift. Stripe's receipt is the confirmation that means something.
+  */}
+  <section class="thanks wrap">
+    <p class="eyebrow eyebrow--accent" data-reveal>Received</p>
+    <h1 class="h2 thanks__title" data-reveal style="--delay:80ms">
+      Thank you. That is one more beautiful thing than there would have been.
+    </h1>
+    <p class="lede thanks__lede" data-reveal style="--delay:180ms">
+      Stripe has emailed your receipt. It goes into the next thing {known.name}
+      makes — a record, a staging, a shoot.
+    </p>
+    <p data-reveal style="--delay:260ms">
+      <a class="link" href="/">Back to the work <span aria-hidden="true">→</span></a>
+    </p>
+  </section>
+</Base>
+
+<style>
+  .thanks {
+    min-height: 72svh;
+    display: grid;
+    align-content: center;
+    padding-top: clamp(8rem, 16vw, 12rem);
+    padding-bottom: clamp(4rem, 10vw, 8rem);
+  }
+  .thanks__title { max-width: 22ch; }
+  .thanks__lede { margin-top: 2rem; max-width: 40ch; }
+  .thanks .link { margin-top: 2.6rem; }
+</style>
