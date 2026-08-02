@@ -14,8 +14,38 @@ export const known = {
   name: 'KNOWN',
   /** KNOWN's own site. The organisation is larger than this donation flow. */
   site: 'https://iamknown.live',
+  /**
+   * How the ask behaves.
+   *
+   *   'give'    — the Stripe checkout. Where we are: the account is live and
+   *               taking cards.
+   *   'enquiry' — collect supporters and talk to them instead. Built during
+   *               the outage when Stripe reset the account recovery code
+   *               mid-setup, kept because outages recur and rebuilding a
+   *               payment path in a hurry is how validation goes missing.
+   *
+   * Both render through the same component, so the page, the wording and the
+   * styling are identical either way. Flipping this is a one-word deploy.
+   */
+  mode: 'give' as 'enquiry' | 'give',
+
   /** Set to false to close giving; the page explains itself either way. */
   open: true,
+
+  /**
+   * Offered as bands, not a number. Somebody who is thinking about $10,000
+   * should not have to type it into a box that looks like a shop, and
+   * "whatever helps" is a real answer that a number field would have thrown
+   * away.
+   */
+  bands: [
+    'Under $100',
+    '$100 – $500',
+    '$500 – $2,500',
+    '$2,500 – $10,000',
+    'More than $10,000',
+    'Whatever helps most',
+  ],
 
   /** The mission, as the company states it. Rendered as a stack, not prose. */
   mission: [

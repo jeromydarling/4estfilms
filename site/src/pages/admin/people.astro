@@ -1,0 +1,228 @@
+---
+import { env } from 'cloudflare:workers';
+import Admin from '../../layouts/Admin.astro';
+import { hasSession } from '../../lib/admin';
+
+export const prerender = false;
+
+const signedIn = await hasSession(Astro.request);
+if (!signedIn) return Astro.redirect('/admin/');
+
+const url = Astro.url;
+const tab = ['list', 'gifts', 'enquiries'].includes(url.searchParams.get('tab') ?? '')
+  ? url.searchParams.get('tab')!
+  : 'list';
+const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
+const page = Math.max(1, Math.min(999, Number(url.searchParams.get('page') ?? 1) || 1));
+const PER = 50;
+const offset = (page - 1) * PER;
+
+interface Row { [k: string]: unknown }
+let rows: Row[] = [];
+let total = 0;
+
+if (env.DB) {
+  const db = env.DB;
+  // `like` is bound as a parameter, never interpolated — this string comes
+  // from the query string.
+  const like = `%${q}%`;
+
+  if (tab === 'list') {
+    const where = q ? `WHERE email LIKE ?1 OR first_name LIKE ?1` : '';
+    const c = await db
+      .prepare(`SELECT COUNT(*) AS n FROM subscribers ${where}`)
+      .bind(...(q ? [like] : []))
+      .first<{ n: number }>();
+    total = c?.n ?? 0;
+    const r = await db
+      .prepare(
+        `SELECT email, first_name, film, COALESCE(utm_source, referrer, 'direct') AS channel,
+                confirmed_at, unsubscribed_at, created_at
+           FROM subscribers ${where}
+          ORDER BY created_at DESC LIMIT ${PER} OFFSET ${offset}`
+      )
+      .bind(...(q ? [like] : []))
+      .all<Row>();
+    rows = r.results ?? [];
+  } else if (tab === 'gifts') {
+    const where = q ? `WHERE email LIKE ?1 OR name LIKE ?1` : '';
+    const c = await db
+      .prepare(`SELECT COUNT(*) AS n FROM donations ${where}`)
+      .bind(...(q ? [like] : []))
+      .first<{ n: number }>();
+    total = c?.n ?? 0;
+    const r = await db
+      .prepare(
+        `SELECT name, email, amount_cents, currency, status, ip_country, utm_source, created_at
+           FROM donations ${where}
+          ORDER BY created_at DESC LIMIT ${PER} OFFSET ${offset}`
+      )
+      .bind(...(q ? [like] : []))
+      .all<Row>();
+    rows = r.results ?? [];
+  } else {
+    const where = q ? `WHERE email LIKE ?1 OR name LIKE ?1 OR message LIKE ?1` : '';
+    const c = await db
+      .prepare(`SELECT COUNT(*) AS n FROM support_enquiries ${where}`)
+      .bind(...(q ? [like] : []))
+      .first<{ n: number }>();
+    total = c?.n ?? 0;
+    const r = await db
+      .prepare(
+        `SELECT name, email, amount_band, message, wants_host, status, created_at
+           FROM support_enquiries ${where}
+          ORDER BY created_at DESC LIMIT ${PER} OFFSET ${offset}`
+      )
+      .bind(...(q ? [like] : []))
+      .all<Row>();
+    rows = r.results ?? [];
+  }
+}
+
+const pages = Math.max(1, Math.ceil(total / PER));
+const money = (c: unknown) =>
+  (Number(c ?? 0) / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const day = (s: unknown) => (s ? String(s).slice(0, 10) : '—');
+const href = (o: Record<string, string | number>) => {
+  const p = new URLSearchParams({ tab, ...(q ? { q } : {}), ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) });
+  return `/admin/people/?${p}`;
+};
+const tabs: [string, string][] = [
+  ['list', 'Mailing list'],
+  ['gifts', 'Gifts'],
+  ['enquiries', 'Enquiries'],
+];
+---
+
+<Admin title="People">
+  <h1>People</h1>
+  <p class="sub">Everyone who has given you an address, and why.</p>
+
+  <div class="tabs">
+    {tabs.map(([k, label]) => (
+      <a href={`/admin/people/?tab=${k}`} class={k === tab ? 'on' : ''}>{label}</a>
+    ))}
+    <form class="search" method="get">
+      <input type="hidden" name="tab" value={tab} />
+      <input type="search" name="q" value={q} placeholder="Search name or email" />
+    </form>
+    <a class="csv" href={`/api/admin/export?tab=${tab}`}>Export CSV</a>
+  </div>
+
+  <p class="count">{total.toLocaleString()} {total === 1 ? 'row' : 'rows'}</p>
+
+  <div class="scroll">
+    {tab === 'list' && (
+      <table>
+        <thead>
+          <tr><th>Email</th><th>Name</th><th>For</th><th>Channel</th><th>State</th><th>Joined</th></tr>
+        </thead>
+        <tbody>
+          {rows.length ? rows.map((r) => (
+            <tr>
+              <td>{String(r.email)}</td>
+              <td>{r.first_name ? String(r.first_name) : '—'}</td>
+              <td>{r.film ? String(r.film) : 'company'}</td>
+              <td>{String(r.channel)}</td>
+              <td>
+                {r.unsubscribed_at
+                  ? <span class="tag tag--gone">unsubscribed</span>
+                  : r.confirmed_at
+                    ? <span class="tag tag--ok">confirmed</span>
+                    : <span class="tag">pending</span>}
+              </td>
+              <td class="num">{day(r.created_at)}</td>
+            </tr>
+          )) : <tr><td colspan="6" class="empty">Nothing here yet.</td></tr>}
+        </tbody>
+      </table>
+    )}
+
+    {tab === 'gifts' && (
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th class="right">Amount</th><th>Status</th><th>From</th><th>When</th></tr>
+        </thead>
+        <tbody>
+          {rows.length ? rows.map((r) => (
+            <tr>
+              <td>{r.name ? String(r.name) : '—'}</td>
+              <td>{r.email ? String(r.email) : '—'}</td>
+              <td class="right num">{money(r.amount_cents)}</td>
+              <td>{String(r.status)}</td>
+              <td>{r.utm_source ? String(r.utm_source) : (r.ip_country ? String(r.ip_country) : '—')}</td>
+              <td class="num">{day(r.created_at)}</td>
+            </tr>
+          )) : <tr><td colspan="6" class="empty">No gifts recorded yet.</td></tr>}
+        </tbody>
+      </table>
+    )}
+
+    {tab === 'enquiries' && (
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Had in mind</th><th>Message</th><th>Host?</th><th>When</th></tr>
+        </thead>
+        <tbody>
+          {rows.length ? rows.map((r) => (
+            <tr>
+              <td>{r.name ? String(r.name) : '—'}</td>
+              <td>{String(r.email)}</td>
+              <td>{r.amount_band ? String(r.amount_band) : '—'}</td>
+              <td class="msg">{r.message ? String(r.message) : '—'}</td>
+              <td>{Number(r.wants_host) ? 'Yes' : '—'}</td>
+              <td class="num">{day(r.created_at)}</td>
+            </tr>
+          )) : <tr><td colspan="6" class="empty">No enquiries yet.</td></tr>}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  {pages > 1 && (
+    <nav class="pager">
+      {page > 1 && <a href={href({ page: page - 1 })}>← Newer</a>}
+      <span>Page {page} of {pages}</span>
+      {page < pages && <a href={href({ page: page + 1 })}>Older →</a>}
+    </nav>
+  )}
+</Admin>
+
+<style>
+  .tabs { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .tabs > a {
+    text-decoration: none; color: var(--dim); font-size: .88rem;
+    padding: .3rem .1rem; border-bottom: 2px solid transparent;
+  }
+  .tabs > a.on { color: var(--bone); border-bottom-color: var(--blood); }
+  .tabs > a:hover { color: var(--bone); }
+  .search { margin-left: auto; }
+  .search input {
+    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 3px;
+    color: var(--bone); font: inherit; font-size: .85rem; padding: .4rem .7rem; width: 15rem;
+  }
+  .search input:focus { outline: 0; border-color: var(--blood); }
+  .csv {
+    font-size: .8rem; color: var(--dim); text-decoration: none;
+    border: 1px solid var(--rule); border-radius: 3px; padding: .38rem .8rem;
+  }
+  .csv:hover { color: var(--bone); border-color: var(--faint); }
+
+  .count { color: var(--faint); font-size: .8rem; margin: 0 0 .6rem; font-family: var(--mono); }
+
+  .tag {
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--faint);
+    border: 1px solid var(--rule); border-radius: 999px; padding: .12rem .5rem;
+    white-space: nowrap;
+  }
+  .tag--ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+  .tag--gone { color: var(--faint); opacity: .7; }
+
+  .msg { max-width: 32rem; white-space: pre-wrap; }
+
+  .pager { display: flex; gap: 1.5rem; align-items: center; margin-top: 1.2rem; font-size: .85rem; }
+  .pager span { color: var(--faint); font-family: var(--mono); font-size: .75rem; }
+  .pager a { color: var(--dim); text-decoration: none; }
+  .pager a:hover { color: var(--bone); }
+</style>

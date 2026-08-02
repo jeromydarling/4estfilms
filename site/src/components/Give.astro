@@ -5,25 +5,33 @@ import { dollars } from '../lib/premiere';
 interface Props {
   /** Button label. The default is the framing we use everywhere. */
   cta?: string;
-  /** Shown above the amounts. */
+  /** Shown above the fields. */
   label?: string;
 }
-const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
+const { cta = 'Join the Story', label = 'Join the story' } = Astro.props;
 ---
 
 {/*
-  The gift form, used on the home page and on /known/.
+  The ask, in whichever form it currently takes.
 
-  One component rather than two copies because the amounts, the ceiling and
-  the wording are the sort of thing that gets changed in a hurry, and a second
-  copy is the one that gets missed. The script below is bundled once by Astro
-  and binds every instance on the page.
+  `known.mode` decides: 'give' is the Stripe checkout, 'enquiry' is a
+  conversation. We are on 'enquiry' because Stripe locked the account
+  mid-setup. Both live here rather than in two components so the page, the
+  wording and the styling stay identical when the switch flips back — the
+  only thing that should change that day is what the button does.
 
-  Checkout is a redirect to Stripe rather than Stripe's embedded form: the
-  embed needs a publishable key we have not been given, and this is already
-  two clicks — pick an amount, go.
+  One component, used on the home page and on /known/. The script binds every
+  instance on the page.
 */}
-{known.open ? (
+{!known.open ? (
+  <div class="soon">
+    <p class="eyebrow eyebrow--accent">Not yet</p>
+    <p class="soon__lede">Giving opens shortly.</p>
+    <p class="dim">
+      Put your address in anywhere on the site and you’ll hear when it does.
+    </p>
+  </div>
+) : known.mode === 'give' ? (
   <form class="gift" data-gift>
     <p class="gift__label">{label}</p>
     <div class="gift__amounts">
@@ -57,18 +65,62 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
     </p>
   </form>
 ) : (
-  <div class="soon">
-    <p class="eyebrow eyebrow--accent">Not yet</p>
-    <p class="soon__lede">Giving opens shortly.</p>
-    <p class="dim">
-      Put your address in anywhere on the site and you’ll hear when it does.
+  <form class="gift" data-enquiry>
+    <p class="gift__label">{label}</p>
+    <p class="dim gift__intro">
+      We’re finishing the paperwork on our giving setup. Leave your details and
+      we’ll come to you the moment it opens — personally, not from a queue.
     </p>
-  </div>
+
+    <label class="field">
+      <span class="field__label">Your name</span>
+      <input type="text" name="name" autocomplete="name" placeholder="Jane Ross" />
+    </label>
+
+    <label class="field">
+      <span class="field__label">Email</span>
+      <input
+        type="email" name="email" required autocomplete="email"
+        placeholder="you@example.com" spellcheck="false"
+      />
+    </label>
+
+    <label class="field">
+      <span class="field__label">What you had in mind <span class="field__opt">optional</span></span>
+      <select name="amount_band">
+        <option value="">Rather not say yet</option>
+        {known.bands.map((b) => <option value={b}>{b}</option>)}
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Anything you’d like to say <span class="field__opt">optional</span></span>
+      <textarea name="message" rows="3" placeholder="Why this matters to you, or what you’d like to know."></textarea>
+    </label>
+
+    <label class="check">
+      <input type="checkbox" name="wants_host" />
+      <span>I’d also like to host a screening in my town</span>
+    </label>
+
+    {/* Bots fill every field they find; humans never see this one. */}
+    <div class="hp" aria-hidden="true">
+      <label>Website<input type="text" name="hp_url" tabindex="-1" autocomplete="off" /></label>
+    </div>
+
+    <button class="gift__go" type="submit">{cta}</button>
+    <p class="gift__msg" role="status" aria-live="polite"></p>
+    <p class="dim gift__fine">
+      No card is taken and nothing is charged. We’ll only write to you about
+      this.
+    </p>
+  </form>
 )}
 
 <script>
   import { read, track } from '../lib/attribution';
 
+  // ── the Stripe checkout, when known.mode is 'give' ──
   for (const form of document.querySelectorAll<HTMLFormElement>('[data-gift]')) {
     const buttons = [...form.querySelectorAll<HTMLButtonElement>('.gift__amount')];
     const other = form.querySelector<HTMLInputElement>('input[name=other]')!;
@@ -78,11 +130,9 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
     let cents = Number(
       buttons.find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset.amount ?? 5000
     );
-
     const select = (b: HTMLButtonElement | null) => {
       for (const x of buttons) x.setAttribute('aria-pressed', String(x === b));
     };
-
     for (const b of buttons) {
       b.addEventListener('click', () => {
         cents = Number(b.dataset.amount);
@@ -105,7 +155,6 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
       go.disabled = true;
       msg.dataset.state = '';
       msg.textContent = 'Opening checkout…';
-
       try {
         const attr = read();
         track('known_give_start');
@@ -134,6 +183,58 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
       }
     });
   }
+
+  // ── the conversation, when known.mode is 'enquiry' ──
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-enquiry]')) {
+    const go = form.querySelector<HTMLButtonElement>('.gift__go')!;
+    const msg = form.querySelector<HTMLParagraphElement>('.gift__msg')!;
+    const email = form.querySelector<HTMLInputElement>('input[type=email]')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!email.reportValidity()) return;
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Sending…';
+      try {
+        const attr = read();
+        const f = new FormData(form);
+        track('known_enquiry');
+        const res = await fetch('/api/known/enquiry', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            name: f.get('name'),
+            email: f.get('email'),
+            amount_band: f.get('amount_band'),
+            message: f.get('message'),
+            wants_host: f.get('wants_host') === 'on',
+            hp_url: f.get('hp_url'),
+            utm_source: attr.utm_source,
+            utm_campaign: attr.utm_campaign,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (body.ok) {
+          // Replace the form rather than clearing it — a blank form after a
+          // successful send reads as "that did not work, do it again".
+          form.innerHTML =
+            '<p class="eyebrow eyebrow--accent">Thank you</p>' +
+            '<p class="soon__lede">We’ll come to you the moment giving opens.</p>' +
+            '<p class="dim">There’s a note in your inbox confirming it. Reply to that ' +
+            'any time — it comes straight to us.</p>';
+          return;
+        }
+        msg.dataset.state = 'err';
+        msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        go.disabled = false;
+      }
+    });
+  }
 </script>
 
 <style>
@@ -141,6 +242,8 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
     font-family: var(--mono); font-size: .68rem; letter-spacing: .2em;
     text-transform: uppercase; color: var(--bone-faint); margin: 0 0 1.2rem;
   }
+  .gift__intro { font-size: .92rem; margin: 0 0 1.6rem; }
+
   /* A grid, not wrapping flex: with four chips the last one wrapped onto a
      row of its own on a phone and read as a different kind of button. */
   .gift__amounts {
@@ -164,14 +267,51 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
 
   .gift__other { display: flex; align-items: baseline; gap: .4rem; }
   .gift__sign { font-family: var(--display); color: var(--bone-faint); }
-  .gift input {
+
+  .field { display: block; margin-bottom: 1.3rem; }
+  .field__label {
+    display: block;
+    font-family: var(--mono); font-size: .64rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--bone-faint); margin-bottom: .5rem;
+  }
+  .field__opt { text-transform: none; letter-spacing: .04em; opacity: .7; }
+
+  .gift input, .gift select, .gift textarea {
     width: 100%; background: transparent; border: 0;
     border-bottom: 1px solid var(--rule); color: var(--bone);
     font-family: var(--display); font-size: 1.05rem; padding: .6rem .2rem;
     transition: border-color .4s var(--ease); min-width: 0;
   }
-  .gift input::placeholder { color: var(--bone-faint); }
-  .gift input:focus { outline: 0; border-color: var(--blood-lift); }
+  .gift textarea { resize: vertical; line-height: 1.45; font-size: 1rem; }
+  .gift select {
+    appearance: none;
+    /* the caret, drawn — a background image would be one more request */
+    background-image: linear-gradient(45deg, transparent 50%, var(--bone-faint) 50%),
+                      linear-gradient(135deg, var(--bone-faint) 50%, transparent 50%);
+    background-position: right .9rem center, right .55rem center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+  /* the menu itself is drawn by the OS and does not inherit the page */
+  .gift select option { background: var(--ink-2); color: var(--bone); }
+  .gift input::placeholder, .gift textarea::placeholder { color: var(--bone-faint); }
+  .gift input:focus, .gift select:focus, .gift textarea:focus {
+    outline: 0; border-color: var(--blood-lift);
+  }
+
+  .check {
+    display: flex; align-items: flex-start; gap: .7rem;
+    font-size: .92rem; color: var(--bone-dim); cursor: pointer;
+    margin-top: .4rem;
+  }
+  .check input {
+    width: 1rem; height: 1rem; flex: 0 0 auto; margin-top: .15rem;
+    accent-color: var(--blood-lift); cursor: pointer;
+  }
+
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
   .gift__go {
     width: 100%; margin-top: 1.8rem;
@@ -187,11 +327,11 @@ const { cta = 'Join the Story', label = 'Choose an amount' } = Astro.props;
   .gift__msg[data-state='err'] { color: #d98080; }
   .gift__fine { font-size: .8rem; margin-top: 1.1rem; }
 
-  .soon__lede {
+  .soon__lede, .gift .soon__lede {
     font-family: var(--display); font-size: clamp(1.3rem, 2.6vw, 1.8rem);
-    line-height: 1.2; margin: 0 0 1.2rem;
+    line-height: 1.2; margin: .6rem 0 1.2rem;
   }
-  .soon .dim { font-size: .95rem; }
+  .soon .dim, .gift .dim { font-size: .95rem; }
 
   @media (prefers-reduced-motion: reduce) {
     .gift__amount, .gift__go { transition: none; }

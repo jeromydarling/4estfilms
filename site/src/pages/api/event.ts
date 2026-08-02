@@ -21,6 +21,9 @@ const NAMES = new Set([
   // gift itself is recorded by the webhook; this is the other half of the
   // pair, and the gap between them is the checkout drop-off.
   'known_give_start',
+  // The same intent as known_give_start, while there is no checkout to send
+  // anyone to. Kept distinct so the two eras do not blur into one number.
+  'known_enquiry',
 ]);
 
 const str = (v: unknown, max: number) =>

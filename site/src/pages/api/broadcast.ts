@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { layout, send, SITE } from '../../lib/email';
+import { isAdmin } from '../../lib/admin';
 
 export const prerender = false;
 
@@ -36,15 +37,6 @@ const json = (b: unknown, status = 200) =>
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
 
-const constantTimeEqual = (a: string, b: string) => {
-  const enc = new TextEncoder();
-  const x = enc.encode(a);
-  const y = enc.encode(b);
-  let diff = x.length ^ y.length;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
-  return diff === 0;
-};
-
 interface Body {
   campaign?: string;
   subject?: string;
@@ -74,10 +66,10 @@ const stripTags = (html: string) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-export const POST: APIRoute = async ({ request }) => {
-  const secret = (env as unknown as { ADMIN_TOKEN?: string }).ADMIN_TOKEN;
-  const offered = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (!secret || !offered || !constantTimeEqual(secret, offered)) return json({ ok: false }, 404);
+export const POST: APIRoute = async ({ request, url }) => {
+  // Bearer token or an admin session — isAdmin() only honours the cookie on
+  // a same-origin request, because a cookie is ambient and a header is not.
+  if (!(await isAdmin(request, url))) return json({ ok: false }, 404);
 
   const db = env.DB;
   if (!db) return json({ ok: false, error: 'unavailable' }, 503);

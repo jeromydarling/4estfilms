@@ -34,6 +34,13 @@ export interface Outgoing {
   /** Per-subscriber token; drives the unsubscribe headers. */
   token?: string;
   campaign?: string;
+  /**
+   * Where a reply should land. Defaults to the sending address, which is
+   * right for anything we send to a subscriber. It is wrong for a message
+   * we send to ourselves about somebody — hitting reply there should reach
+   * them, not us.
+   */
+  replyTo?: string;
 }
 
 export async function send(msg: Outgoing): Promise<{ messageId: string }> {
@@ -53,7 +60,7 @@ export async function send(msg: Outgoing): Promise<{ messageId: string }> {
   return EMAIL.send({
     to: msg.to,
     from: FROM,
-    replyTo: FROM.email,
+    replyTo: msg.replyTo ?? FROM.email,
     subject: msg.subject,
     html: msg.html,
     text: msg.text,

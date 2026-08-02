@@ -1,0 +1,124 @@
+---
+interface Props {
+  title: string;
+  /** Hidden on the sign-in screen, where there is nothing to navigate to. */
+  nav?: boolean;
+}
+const { title, nav = true } = Astro.props;
+const path = Astro.url.pathname;
+
+const links = [
+  ['/admin/', 'Overview'],
+  ['/admin/people/', 'People'],
+  ['/admin/newsletter/', 'Newsletter'],
+];
+---
+
+{/*
+  A deliberately separate shell from Base.astro. The site layout carries an
+  intro animation, a scroll-reveal gate, prefetching and JSON-LD, none of
+  which belong on a page you open to check a number. It also keeps the admin
+  out of the site's visual language enough that you always know which one
+  you are looking at.
+*/}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — 4est admin</title>
+    {/* Not a public page. Belt to the robots.txt braces. */}
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    {nav && (
+      <header class="bar">
+        <a class="bar__home" href="/">4est</a>
+        <nav>
+          {links.map(([href, label]) => (
+            <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>
+          ))}
+        </nav>
+        <button type="button" class="bar__out" data-signout>Sign out</button>
+      </header>
+    )}
+    <main class="page"><slot /></main>
+
+    <script>
+      for (const b of document.querySelectorAll<HTMLButtonElement>('[data-signout]')) {
+        b.addEventListener('click', async () => {
+          await fetch('/api/admin/login', { method: 'DELETE' });
+          location.href = '/admin/';
+        });
+      }
+    </script>
+
+    <style is:global>
+      :root {
+        --ink: #08080a; --ink-2: #101115; --ink-3: #171a1f;
+        --bone: #f2ede3; --dim: #a9a296; --faint: #6c675e;
+        --rule: #262a30; --blood: #c4082e; --good: #4a9d6b;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--ink); color: var(--bone);
+        font-family: var(--sans); font-size: 15px; line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--bone); }
+      .page { max-width: 1180px; margin: 0 auto; padding: 2rem 1.5rem 6rem; }
+
+      .bar {
+        display: flex; align-items: center; gap: 1.5rem;
+        padding: .9rem 1.5rem; border-bottom: 1px solid var(--rule);
+        position: sticky; top: 0; background: var(--ink); z-index: 10;
+      }
+      .bar__home {
+        font-weight: 700; letter-spacing: .04em; text-decoration: none;
+        color: var(--bone); opacity: .8;
+      }
+      .bar nav { display: flex; gap: 1.2rem; flex: 1 1 auto; flex-wrap: wrap; }
+      .bar nav a {
+        text-decoration: none; color: var(--dim); font-size: .88rem;
+        padding: .2rem 0; border-bottom: 1px solid transparent;
+      }
+      .bar nav a:hover { color: var(--bone); }
+      .bar nav a[aria-current='page'] { color: var(--bone); border-bottom-color: var(--blood); }
+      .bar__out {
+        background: none; border: 1px solid var(--rule); color: var(--dim);
+        font: inherit; font-size: .8rem; padding: .35rem .8rem;
+        border-radius: 3px; cursor: pointer;
+      }
+      .bar__out:hover { color: var(--bone); border-color: var(--faint); }
+
+      h1 { font-size: 1.5rem; margin: 0 0 .3rem; font-weight: 600; letter-spacing: -.01em; }
+      h2 { font-size: 1rem; margin: 2.5rem 0 .9rem; font-weight: 600; }
+      .sub { color: var(--dim); margin: 0 0 2rem; font-size: .92rem; }
+
+      .label {
+        font-family: var(--mono); font-size: .66rem; letter-spacing: .14em;
+        text-transform: uppercase; color: var(--faint);
+      }
+
+      table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+      th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--rule); }
+      th {
+        font-family: var(--mono); font-size: .64rem; letter-spacing: .12em;
+        text-transform: uppercase; color: var(--faint); font-weight: 400;
+        white-space: nowrap;
+      }
+      td { vertical-align: top; }
+      tbody tr:hover { background: var(--ink-2); }
+      .num { font-variant-numeric: tabular-nums; }
+      .right { text-align: right; }
+      /* Wide tables scroll inside their own box; the page never does. */
+      .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; }
+      .scroll table td:first-child, .scroll table th:first-child { padding-left: 1rem; }
+
+      .empty { color: var(--faint); padding: 2rem 1rem; text-align: center; font-size: .9rem; }
+    </style>
+  </body>
+</html>
