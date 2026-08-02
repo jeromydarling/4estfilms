@@ -28,7 +28,15 @@ export default defineConfig({
   //     and resends are already capped at one an hour per address;
   //   - /unsubscribe must accept a cross-origin POST by design, and only
   //     ever removes the holder of a 128-bit token.
-  // Revisit this the moment anything here starts authenticating with a cookie.
+  //
+  // Revisited, as that note asked: /admin now authenticates with a cookie.
+  // Rather than turning this back on and breaking one-click unsubscribe
+  // again, the origin check moved to the routes that actually carry ambient
+  // credentials — sameOrigin() in lib/admin.ts, enforced on sign-in, sign-out
+  // and every cookie-authenticated call. The session cookie is also
+  // SameSite=Strict, so the browser will not attach it cross-site in the
+  // first place. Global check off, local check on, and the mail providers
+  // still get their 200.
   security: { checkOrigin: false },
   // Content pages are pure static; only the API routes need the server.
   prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },

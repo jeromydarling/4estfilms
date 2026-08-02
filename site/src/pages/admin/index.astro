@@ -1,0 +1,280 @@
+---
+import { env } from 'cloudflare:workers';
+import Admin from '../../layouts/Admin.astro';
+import { hasSession } from '../../lib/admin';
+
+export const prerender = false;
+
+const signedIn = await hasSession(Astro.request);
+
+interface Row { [k: string]: unknown }
+let totals: Row = {};
+let money: Row = {};
+let bySource: Row[] = [];
+let byFilm: Row[] = [];
+let funnel: Row[] = [];
+let recent: Row[] = [];
+let cities: Row[] = [];
+
+if (signedIn && env.DB) {
+  const db = env.DB;
+  /**
+   * Each panel survives its own failure.
+   *
+   * These were one Promise.all, and a missing table took the whole page to a
+   * 500 — which is the wrong trade for a dashboard. A number you cannot see
+   * is a nuisance; a page you cannot open while you are trying to find out
+   * what is wrong is worse.
+   */
+  const safe = async <T,>(label: string, run: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await run();
+    } catch (err) {
+      console.error(`admin overview: ${label} failed`, err);
+      return fallback;
+    }
+  };
+  const one = (label: string, sql: string) =>
+    safe<Row>(label, async () => (await db.prepare(sql).first<Row>()) ?? {}, {});
+  const many = (label: string, sql: string) =>
+    safe<Row[]>(label, async () => (await db.prepare(sql).all<Row>()).results ?? [], []);
+
+  [totals, money, bySource, byFilm, funnel, recent, cities] = await Promise.all([
+    one(
+      'totals',
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS confirmed,
+              SUM(CASE WHEN unsubscribed_at IS NOT NULL THEN 1 ELSE 0 END) AS gone
+         FROM subscribers`
+    ),
+    one(
+      'money',
+      `SELECT COUNT(*) AS gifts, COALESCE(SUM(amount_cents), 0) AS cents
+         FROM donations WHERE status = 'paid'`
+    ),
+    many(
+      'channels',
+      `SELECT COALESCE(utm_source, referrer, 'direct') AS channel, COUNT(*) AS n
+         FROM subscribers GROUP BY channel ORDER BY n DESC LIMIT 8`
+    ),
+    many(
+      'films',
+      `SELECT COALESCE(film, 'company') AS for_film, COUNT(*) AS n
+         FROM subscribers WHERE unsubscribed_at IS NULL GROUP BY for_film ORDER BY n DESC`
+    ),
+    many(
+      'trailer',
+      `SELECT name, COUNT(DISTINCT session) AS n
+         FROM events WHERE name LIKE 'trailer_%' GROUP BY name ORDER BY n DESC`
+    ),
+    many(
+      'recent',
+      `SELECT date(created_at) AS day, COUNT(*) AS n
+         FROM subscribers GROUP BY day ORDER BY day DESC LIMIT 14`
+    ),
+    many(
+      'cities',
+      `SELECT city, region, COUNT(*) AS n
+         FROM screening_requests GROUP BY city, region ORDER BY n DESC LIMIT 8`
+    ),
+  ]);
+}
+
+const dollars = (cents: number) =>
+  (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+const peak = Math.max(1, ...recent.map((r) => Number(r.n)));
+---
+
+{signedIn ? (
+  <Admin title="Overview">
+    <h1>Overview</h1>
+    <p class="sub">Everything the site knows, as of this page load.</p>
+
+    <div class="tiles">
+      <div class="tile">
+        <p class="label">On the list</p>
+        <p class="tile__n num">{Number(totals.confirmed ?? 0).toLocaleString()}</p>
+        <p class="tile__note">
+          {Number(totals.total ?? 0).toLocaleString()} signed up ·
+          {' '}{Number(totals.gone ?? 0).toLocaleString()} unsubscribed
+        </p>
+      </div>
+      <div class="tile">
+        <p class="label">Given to KNOWN</p>
+        <p class="tile__n num">{dollars(Number(money.cents ?? 0))}</p>
+        <p class="tile__note">{Number(money.gifts ?? 0).toLocaleString()} gifts</p>
+      </div>
+      <div class="tile">
+        <p class="label">Screening requests</p>
+        <p class="tile__n num">
+          {cities.reduce((s, c) => s + Number(c.n), 0).toLocaleString()}
+        </p>
+        <p class="tile__note">{cities.length} cities with any demand</p>
+      </div>
+    </div>
+
+    <h2>Signups, last 14 days</h2>
+    {recent.length ? (
+      <div class="spark">
+        {[...recent].reverse().map((r) => (
+          <div class="spark__col" title={`${r.day}: ${r.n}`}>
+            <div class="spark__bar" style={`height:${Math.round((Number(r.n) / peak) * 100)}%`}></div>
+            <span class="spark__day">{String(r.day).slice(5)}</span>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p class="empty">Nobody yet.</p>
+    )}
+
+    <div class="cols">
+      <section>
+        <h2>Where they came from</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Channel</th><th class="right">Signups</th></tr></thead>
+            <tbody>
+              {bySource.length ? bySource.map((r) => (
+                <tr><td>{String(r.channel)}</td><td class="right num">{String(r.n)}</td></tr>
+              )) : <tr><td colspan="2" class="empty">Nothing yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>What they signed up for</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Film</th><th class="right">On the list</th></tr></thead>
+            <tbody>
+              {byFilm.length ? byFilm.map((r) => (
+                <tr><td>{String(r.for_film)}</td><td class="right num">{String(r.n)}</td></tr>
+              )) : <tr><td colspan="2" class="empty">Nothing yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Trailer</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Event</th><th class="right">People</th></tr></thead>
+            <tbody>
+              {funnel.length ? funnel.map((r) => (
+                <tr><td>{String(r.name).replace('trailer_', '')}</td><td class="right num">{String(r.n)}</td></tr>
+              )) : <tr><td colspan="2" class="empty">Nobody has pressed play.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cities asking</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>City</th><th class="right">Requests</th></tr></thead>
+            <tbody>
+              {cities.length ? cities.map((r) => (
+                <tr>
+                  <td>{String(r.city)}{r.region ? `, ${r.region}` : ''}</td>
+                  <td class="right num">{String(r.n)}</td>
+                </tr>
+              )) : <tr><td colspan="2" class="empty">No requests yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </Admin>
+) : (
+  <Admin title="Sign in" nav={false}>
+    <div class="gate">
+      <p class="label">4est Films</p>
+      <h1>Sign in</h1>
+      <form data-login>
+        <label class="sr" for="pw">Password</label>
+        <input id="pw" type="password" name="password" required autocomplete="current-password"
+               placeholder="Password" autofocus />
+        <button type="submit">Sign in</button>
+        <p class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <script>
+      const form = document.querySelector<HTMLFormElement>('[data-login]');
+      const msg = form?.querySelector<HTMLParagraphElement>('.msg');
+      const input = form?.querySelector<HTMLInputElement>('input');
+      const go = form?.querySelector<HTMLButtonElement>('button');
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!msg || !input || !go) return;
+        go.disabled = true;
+        msg.textContent = '';
+        try {
+          const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ password: input.value }),
+          });
+          const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+          if (body.ok) { location.reload(); return; }
+          msg.textContent = body.error ?? 'That didn’t work.';
+          input.select();
+        } catch {
+          msg.textContent = 'Network trouble. Try again.';
+        } finally {
+          go.disabled = false;
+        }
+      });
+    </script>
+  </Admin>
+)}
+
+<style>
+  .tiles {
+    display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin-top: 1.5rem;
+  }
+  .tile { border: 1px solid var(--rule); border-radius: 4px; padding: 1.2rem 1.3rem; }
+  .tile__n { font-size: 2rem; margin: .5rem 0 .2rem; font-weight: 600; letter-spacing: -.02em; }
+  .tile__note { margin: 0; color: var(--faint); font-size: .8rem; }
+
+  .spark {
+    display: flex; align-items: flex-end; gap: 4px;
+    height: 120px; margin-top: .5rem;
+    border: 1px solid var(--rule); border-radius: 4px; padding: .8rem;
+  }
+  .spark__col { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end;
+                align-items: center; height: 100%; gap: .4rem; min-width: 0; }
+  /* Capped, because with three days of data a full-width third reads as a
+     block of colour rather than a bar. */
+  .spark__bar {
+    width: 100%; max-width: 46px; background: var(--blood);
+    border-radius: 2px 2px 0 0; min-height: 2px;
+  }
+  .spark__day { font-family: var(--mono); font-size: .58rem; color: var(--faint); white-space: nowrap; }
+
+  .cols { display: grid; gap: 0 2.5rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+  .gate { max-width: 22rem; margin: 12vh auto 0; }
+  .gate h1 { margin: .4rem 0 1.6rem; }
+  .gate input {
+    width: 100%; background: var(--ink-2); border: 1px solid var(--rule);
+    border-radius: 3px; color: var(--bone); font: inherit; padding: .7rem .8rem;
+  }
+  .gate input:focus { outline: 0; border-color: var(--blood); }
+  .gate button {
+    width: 100%; margin-top: .8rem; background: var(--blood); border: 0; border-radius: 3px;
+    color: #fff; font: inherit; font-weight: 600; padding: .7rem; cursor: pointer;
+  }
+  .gate button:disabled { opacity: .6; cursor: progress; }
+  .msg { color: #e08a8a; font-size: .85rem; min-height: 1.2em; margin: .8rem 0 0; }
+  .sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+</style>

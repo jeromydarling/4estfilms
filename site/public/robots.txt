@@ -41,5 +41,6 @@ Allow: /
 # Worker invocations.
 Disallow: /api/
 Disallow: /media/
+Disallow: /admin/
 
 Sitemap: https://4estfilms.studio/sitemap.xml

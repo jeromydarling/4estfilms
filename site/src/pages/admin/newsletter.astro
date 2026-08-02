@@ -1,0 +1,274 @@
+---
+import { env } from 'cloudflare:workers';
+import Admin from '../../layouts/Admin.astro';
+import { hasSession } from '../../lib/admin';
+
+export const prerender = false;
+
+const signedIn = await hasSession(Astro.request);
+if (!signedIn) return Astro.redirect('/admin/');
+
+interface Row { [k: string]: unknown }
+let audience = 0;
+let past: Row[] = [];
+
+if (env.DB) {
+  const db = env.DB;
+  const [a, b] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM subscribers
+          WHERE confirmed_at IS NOT NULL AND unsubscribed_at IS NULL`
+      )
+      .first<{ n: number }>(),
+    db
+      .prepare(
+        `SELECT campaign, COUNT(*) AS sent, MAX(created_at) AS last
+           FROM sends GROUP BY campaign ORDER BY last DESC LIMIT 10`
+      )
+      .all<Row>(),
+  ]);
+  audience = a?.n ?? 0;
+  past = b.results ?? [];
+}
+---
+
+<Admin title="Newsletter">
+  <h1>Newsletter</h1>
+  <p class="sub">
+    {audience.toLocaleString()} confirmed {audience === 1 ? 'address' : 'addresses'} will receive this.
+    Unsubscribed and unconfirmed people are never included.
+  </p>
+
+  <form class="compose" data-compose>
+    <div class="row">
+      <label>
+        <span class="label">Campaign name</span>
+        <input name="campaign" required placeholder="hnim-trailer" pattern="[a-z0-9][a-z0-9-]{2,60}" />
+        <span class="hint">
+          Lowercase slug. This is the memory of who already received it — reuse
+          it to resume, change it to send something new.
+        </span>
+      </label>
+      <label>
+        <span class="label">Subject</span>
+        <input name="subject" required placeholder="The trailer is here." />
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        <span class="label">Heading</span>
+        <input name="heading" placeholder="Defaults to the subject" />
+      </label>
+      <label>
+        <span class="label">Preview text</span>
+        <input name="preheader" placeholder="The line shown beside the subject in an inbox" />
+      </label>
+    </div>
+
+    <label>
+      <span class="label">Body</span>
+      <textarea name="body" required rows="12"
+        placeholder="<p>Write in HTML. Paragraphs in &lt;p&gt; tags.</p>"></textarea>
+      <span class="hint">
+        HTML. Their first name is added above this automatically when we have
+        one, and the unsubscribe footer is added below.
+      </span>
+    </label>
+
+    <div class="row">
+      <label>
+        <span class="label">Button link <span class="opt">optional</span></span>
+        <input name="cta_href" type="url" placeholder="https://4estfilms.studio/films/..." />
+      </label>
+      <label>
+        <span class="label">Button label</span>
+        <input name="cta_label" placeholder="Watch it" />
+      </label>
+    </div>
+
+    <div class="send">
+      <div class="send__test">
+        <label>
+          <span class="label">Send one test to</span>
+          <input name="test" type="email" placeholder="you@example.com" />
+        </label>
+        <button type="button" data-test>Send test</button>
+      </div>
+
+      <div class="send__real">
+        <button type="submit" data-go>Send to {audience.toLocaleString()} people</button>
+        <p class="warn">
+          Sends in batches. Keep this tab open until it finishes — it resumes
+          from where it stopped if you don’t.
+        </p>
+      </div>
+    </div>
+
+    <div class="progress" data-progress hidden>
+      <div class="progress__bar"><div class="progress__fill" data-fill></div></div>
+      <p class="progress__note" data-note></p>
+    </div>
+    <p class="msg" role="status" aria-live="polite" data-msg></p>
+  </form>
+
+  <h2>Already sent</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Campaign</th><th class="right">Delivered</th><th>Last send</th></tr></thead>
+      <tbody>
+        {past.length ? past.map((r) => (
+          <tr>
+            <td>{String(r.campaign)}</td>
+            <td class="right num">{Number(r.sent).toLocaleString()}</td>
+            <td class="num">{String(r.last ?? '').slice(0, 16)}</td>
+          </tr>
+        )) : <tr><td colspan="3" class="empty">Nothing has been sent yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+</Admin>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('[data-compose]');
+  const msg = document.querySelector<HTMLParagraphElement>('[data-msg]');
+  const box = document.querySelector<HTMLDivElement>('[data-progress]');
+  const fill = document.querySelector<HTMLDivElement>('[data-fill]');
+  const note = document.querySelector<HTMLParagraphElement>('[data-note]');
+  const testBtn = document.querySelector<HTMLButtonElement>('[data-test]');
+  const goBtn = document.querySelector<HTMLButtonElement>('[data-go]');
+
+  const say = (text: string, bad = false) => {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.dataset.state = bad ? 'err' : '';
+  };
+
+  /** Everything the endpoint needs, from the form as it stands. */
+  const payload = () => {
+    const f = new FormData(form!);
+    const href = String(f.get('cta_href') ?? '').trim();
+    const label = String(f.get('cta_label') ?? '').trim();
+    return {
+      campaign: String(f.get('campaign') ?? '').trim(),
+      subject: String(f.get('subject') ?? '').trim(),
+      heading: String(f.get('heading') ?? '').trim() || undefined,
+      preheader: String(f.get('preheader') ?? '').trim() || undefined,
+      body: String(f.get('body') ?? ''),
+      cta: href && label ? { href, label } : undefined,
+    };
+  };
+
+  testBtn?.addEventListener('click', async () => {
+    const to = String(new FormData(form!).get('test') ?? '').trim();
+    if (!to) return say('Put an address in the test field first.', true);
+    if (!form!.reportValidity()) return;
+    testBtn.disabled = true;
+    say('Sending the test…');
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload(), test: to }),
+      });
+      const b = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      say(b.ok ? `Test sent to ${to}. Check it before you send for real.` : (b.error ?? 'Test failed.'), !b.ok);
+    } catch {
+      say('Network trouble sending the test.', true);
+    } finally {
+      testBtn.disabled = false;
+    }
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form.reportValidity()) return;
+    const p = payload();
+    if (!confirm(`Send "${p.subject}" to the whole confirmed list?\n\nCampaign: ${p.campaign}`)) return;
+
+    goBtn!.disabled = true;
+    testBtn!.disabled = true;
+    box!.hidden = false;
+    let done = 0;
+    let total = 0;
+
+    try {
+      // The endpoint sends a batch and reports what is left. Calling it until
+      // `remaining` is 0 is the whole protocol — every send is recorded, so a
+      // refresh mid-run resumes rather than starting over.
+      for (;;) {
+        const res = await fetch('/api/broadcast', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(p),
+        });
+        const b = (await res.json().catch(() => ({}))) as
+          { ok?: boolean; sent?: number; remaining?: number; error?: string };
+        if (!b.ok) { say(b.error ?? 'Sending stopped.', true); break; }
+
+        done += b.sent ?? 0;
+        total = done + (b.remaining ?? 0);
+        if (fill && total) fill.style.width = `${Math.round((done / total) * 100)}%`;
+        if (note) note.textContent = `${done.toLocaleString()} sent, ${(b.remaining ?? 0).toLocaleString()} to go`;
+
+        if (!b.remaining) {
+          if (fill) fill.style.width = '100%';
+          say(`Done. ${done.toLocaleString()} delivered.`);
+          break;
+        }
+        // A breath between batches, so a stall is visible rather than a
+        // tight loop against the mail binding.
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    } catch {
+      say('Network trouble. Press send again — it picks up where it stopped.', true);
+    } finally {
+      goBtn!.disabled = false;
+      testBtn!.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .compose { max-width: 46rem; margin-top: 1.5rem; }
+  .compose label { display: block; margin-bottom: 1.2rem; }
+  .compose .label { display: block; margin-bottom: .4rem; }
+  .opt { text-transform: none; letter-spacing: .02em; opacity: .7; }
+  .row { display: grid; gap: 0 1.2rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+  .compose input, .compose textarea {
+    width: 100%; background: var(--ink-2); border: 1px solid var(--rule);
+    border-radius: 3px; color: var(--bone); font: inherit; padding: .55rem .7rem;
+  }
+  .compose textarea { font-family: var(--mono); font-size: .82rem; line-height: 1.55; resize: vertical; }
+  .compose input:focus, .compose textarea:focus { outline: 0; border-color: var(--blood); }
+  .hint { display: block; color: var(--faint); font-size: .76rem; margin-top: .35rem; }
+
+  .send {
+    display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    border-top: 1px solid var(--rule); padding-top: 1.5rem; margin-top: .5rem;
+  }
+  .send__test { display: flex; gap: .6rem; align-items: flex-end; }
+  .send__test label { flex: 1 1 auto; margin: 0; }
+  .send button {
+    font: inherit; font-size: .85rem; border-radius: 3px; cursor: pointer;
+    padding: .55rem 1rem; white-space: nowrap;
+  }
+  [data-test] { background: none; border: 1px solid var(--rule); color: var(--dim); }
+  [data-test]:hover:not(:disabled) { color: var(--bone); border-color: var(--faint); }
+  [data-go] {
+    width: 100%; background: var(--blood); border: 0; color: #fff;
+    font-weight: 600; padding: .7rem 1rem;
+  }
+  .send button:disabled { opacity: .55; cursor: progress; }
+  .warn { color: var(--faint); font-size: .76rem; margin: .5rem 0 0; }
+
+  .progress { margin-top: 1.4rem; }
+  .progress__bar { height: 4px; background: var(--ink-3); border-radius: 2px; overflow: hidden; }
+  .progress__fill { height: 100%; width: 0; background: var(--blood); transition: width .3s ease; }
+  .progress__note { font-family: var(--mono); font-size: .75rem; color: var(--faint); margin: .5rem 0 0; }
+
+  .msg { font-size: .85rem; min-height: 1.2em; margin: .9rem 0 0; color: var(--dim); }
+  .msg[data-state='err'] { color: #e08a8a; }
+</style>
