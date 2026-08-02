@@ -44,11 +44,18 @@ const CARDS = {
     sub: 'A supernatural Western musical, set in Virginia City, Nevada',
   },
   strung: {
-    plate: 'stills/strung/2020-12-17_CI4q_yUgNeX_01.jpg',
-    // A sunlit forest floor. Without a much heavier hand the oxblood kicker
-    // disappears into the highlights.
-    dim: 0.42,
-    tone: 'rgba(13,23,18,.8)',
+    // Full bleed and cropped tight, on purpose — and note this is the
+    // opposite call to the page hero, which shows the same photograph as a
+    // split. Both are right, because they are seen at different sizes: a
+    // share card renders at 400-600px in a feed or a DM, where the upscale
+    // this crop needs is invisible and the intimacy is the point. The page
+    // hero is seen at 1440px, where the same crop turns into texture.
+    plate: 'stills/strung/eric-portrait.webp',
+    focus: '52% 22%',
+    dim: 0.6,
+    tone: 'rgba(13,23,18,.72)',
+    // The mark lands on dark hair here, so it gets its own pool of shade.
+    corner: true,
     kicker: '2019 · 12 awards across 8 festivals',
     title: 'Strung',
     sub: 'Lost in the forest of his own mind',
@@ -94,6 +101,7 @@ const html = async (c) => `
           padding: 68px 76px; color: #f2ede3; }
   .plate { position: absolute; inset: 0; width: 100%; height: 100%;
            object-fit: cover; filter: grayscale(.25) brightness(${c.dim ?? 0.72});
+           object-position: ${c.focus ?? '50% 50%'};
            transform: scale(${c.zoom ?? 1}); }
   .wash { position: absolute; inset: 0;
           background: linear-gradient(72deg, ${c.tone} 0%, ${c.tone} 38%, transparent 100%),
@@ -113,11 +121,27 @@ const html = async (c) => `
          color: #d8d1c5; margin-top: ${c.title ? 24 : 30}px; max-width: 24ch;
          font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40; }
   .mark { position: relative; width: 420px; margin-top: 18px; }
+  /* Split cards: the portrait keeps its own column at the card's height,
+     which is a downscale rather than an upscale, and the ground carries the
+     film's palette instead of a wash over a stretched photograph. */
+  .card--split { background: ${c.ground ?? '#08080a'}; flex-direction: row;
+                 align-items: center; justify-content: space-between;
+                 padding: 0 0 0 76px; }
+  .card--split .body { flex: 1 1 auto; }
+  .card--split .column { position: relative; height: ${H}px; width: auto;
+                         filter: brightness(${c.dim ?? 0.92}) saturate(.92); }
+  /* On a split the top-right corner is the photograph, so the mark moves
+     over to the type side rather than sitting in somebody's hair. */
+  .card--split .corner { left: 76px; right: auto; z-index: 2; }
   .corner { position: absolute; top: 58px; right: 76px; width: 132px; opacity: .92; }
+  ${c.corner ? `.cornershade { position: absolute; top: 0; right: 0; width: 380px; height: 260px;
+      background: radial-gradient(75% 75% at 82% 26%, rgba(8,8,10,.72), transparent 70%); }` : ''}
 </style>
-<div class="card">
-  <img class="plate" src="${await dataUri(c.plate)}">
-  <div class="wash"></div><div class="scan"></div>
+<div class="card${c.split ? ' card--split' : ''}">
+  ${c.split ? '' : `<img class="plate" src="${await dataUri(c.plate)}">`}
+  ${c.split ? '' : '<div class="wash"></div>'}
+  <div class="scan"></div>
+  ${c.corner ? '<div class="cornershade"></div>' : ''}
   ${c.mark ? '' : `<img class="corner" src="${await dataUri('brand/4est-logo-bone.webp')}">`}
   <div class="body">
     ${c.kicker ? `<div class="kicker">${c.kicker}</div>` : ''}
@@ -125,6 +149,7 @@ const html = async (c) => `
     ${c.title ? `<div class="title">${c.title}</div>` : ''}
     ${c.sub ? `<div class="sub">${c.sub}</div>` : ''}
   </div>
+  ${c.split ? `<img class="column" src="${await dataUri(c.plate)}">` : ''}
 </div>`;
 
 /** The same variable woff2 the site itself serves. Deliberately the
