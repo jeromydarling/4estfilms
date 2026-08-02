@@ -1,18 +1,20 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { premiere } from '../../../lib/premiere';
+import { known } from '../../../lib/known';
 
 export const prerender = false;
 
 /**
- * Opens a Stripe Checkout session for a pay-what-you-can ticket.
+ * Opens a Stripe Checkout session for a one-time gift to Known.
  *
- * Talks to Stripe's REST API directly rather than through the SDK: the SDK
- * pulls in Node built-ins that a Worker does not have, and this is two form
- * posts.
+ * Talks to Stripe's REST API directly rather than through the SDK, which
+ * pulls in Node built-ins a Worker does not have.
  *
  * The amount is validated here, on the server. A price posted from the
  * browser is a suggestion, not a fact.
+ *
+ * No email is collected before checkout: Stripe asks for one anyway, and a
+ * field the donor has to fill in twice is a field some of them abandon.
  */
 
 const json = (b: unknown, status = 200) =>
@@ -23,11 +25,11 @@ const json = (b: unknown, status = 200) =>
 
 export const POST: APIRoute = async ({ request, url }) => {
   const key = (env as unknown as { STRIPE_SECRET_KEY?: string }).STRIPE_SECRET_KEY;
-  if (!premiere.open || !key) {
-    return json({ ok: false, error: 'The premiere is not open yet.' }, 503);
+  if (!known.open || !key) {
+    return json({ ok: false, error: 'Giving is not open yet.' }, 503);
   }
 
-  let body: { amount_cents?: number; email?: string; first_name?: string; utm_source?: string; utm_campaign?: string };
+  let body: { amount_cents?: number; utm_source?: string; utm_campaign?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -35,40 +37,38 @@ export const POST: APIRoute = async ({ request, url }) => {
   }
 
   const amount = Math.round(Number(body.amount_cents));
-  if (!Number.isFinite(amount) || amount < premiere.minimumCents) {
+  if (!Number.isFinite(amount) || amount < known.minimumCents) {
+    return json({ ok: false, error: `Minimum is $${known.minimumCents / 100}.` }, 422);
+  }
+  if (amount > known.maximumCents) {
     return json(
-      { ok: false, error: `Minimum is ${premiere.minimumCents / 100} dollars.` },
+      {
+        ok: false,
+        error: `For gifts over $${(known.maximumCents / 100).toLocaleString('en-US')}, write to ${known.contact} — we would rather talk to you.`,
+      },
       422
     );
-  }
-  // A ceiling, because a typo that turns 25 into 2500 should bounce rather
-  // than charge somebody's card for two and a half thousand dollars.
-  if (amount > 100_000) {
-    return json({ ok: false, error: 'For gifts over $1,000, please get in touch.' }, 422);
   }
 
   const origin = url.origin;
   const form = new URLSearchParams({
     mode: 'payment',
-    // Stripe keys the idempotency of the session on our reference; the
-    // webhook uses the session id, which is what actually guards double
-    // counting if a customer refreshes the success page.
-    success_url: `${origin}/watch/strung/?session={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/premiere/`,
-    'line_items[0][price_data][currency]': premiere.currency,
+    success_url: `${origin}/known/thanks/?session={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/known/`,
+    'line_items[0][price_data][currency]': known.currency,
     'line_items[0][price_data][unit_amount]': String(amount),
-    'line_items[0][price_data][product_data][name]': `${premiere.title} — online premiere`,
+    'line_items[0][price_data][product_data][name]': `Gift to ${known.name}`,
     'line_items[0][price_data][product_data][description]':
-      'Pay what you can. Every dollar goes to addiction recovery.',
+      'The non-profit arm of 4est Films. Music, original plays, films.',
     'line_items[0][quantity]': '1',
-    // The webhook is shared with donations to Known and dispatches on this.
-    'metadata[kind]': 'premiere',
-    'metadata[film]': premiere.film,
+    // The webhook is shared with premiere tickets and dispatches on this.
+    'metadata[kind]': 'donation',
+    'metadata[fund]': 'known',
+    // Turns the checkout button from "Pay" into "Donate". Stripe emails the
+    // receipt to the address it collects here; we send nothing.
+    submit_type: 'donate',
   });
-  if (body.email) {
-    form.set('customer_email', String(body.email).slice(0, 254));
-  }
-  if (body.first_name) form.set('metadata[first_name]', String(body.first_name).slice(0, 80));
+
   if (body.utm_source) form.set('metadata[utm_source]', String(body.utm_source).slice(0, 80));
   if (body.utm_campaign) form.set('metadata[utm_campaign]', String(body.utm_campaign).slice(0, 80));
 
@@ -81,7 +81,7 @@ export const POST: APIRoute = async ({ request, url }) => {
       },
       body: form,
     });
-    const session = (await res.json()) as { id?: string; url?: string; error?: { message?: string } };
+    const session = (await res.json()) as { url?: string; error?: { message?: string } };
 
     if (!res.ok || !session.url) {
       console.error('stripe session failed', session.error);

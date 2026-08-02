@@ -1,0 +1,293 @@
+---
+import Base from '../../layouts/Base.astro';
+import { known } from '../../lib/known';
+import { dollars } from '../../lib/premiere';
+export const prerender = true;
+---
+
+<Base
+  title="Known — commission the beautiful thing"
+  description="Known is the non-profit arm of 4est Films. Music, original plays, films. If you want more beautiful things in the world, someone has to commission them."
+  ogImage="/og/known.jpg"
+  ogImageAlt="Known — the non-profit arm of 4est Films"
+>
+  <section class="top wrap">
+    <p class="eyebrow" data-reveal>The non-profit arm of 4est Films</p>
+    <h1 class="display top__title" data-reveal style="--delay:80ms">Known</h1>
+    <p class="lede top__lede" data-reveal style="--delay:180ms">
+      Everyone wants more beautiful things in the world.
+      Almost nobody commissions one.
+    </p>
+  </section>
+
+  <section class="section wrap argument">
+    <div class="argument__body">
+      <p data-reveal>
+        Beautiful things do not arrive. They are paid for, on purpose, by
+        someone who decided the world should have them. The ceiling, the
+        score, the play — every one of them had a person behind it who put
+        money down before there was anything to see.
+      </p>
+      <p data-reveal style="--delay:80ms">
+        That has not changed. What changed is that most of us wait, and assume
+        the commissioning is happening somewhere else, by someone with more
+        money than us. Mostly it isn’t. Work that can’t promise a return
+        doesn’t get funded, and the thing that would have been beautiful
+        quietly becomes the thing that tests well.
+      </p>
+      <p class="argument__turn" data-reveal style="--delay:160ms">
+        So put your money where your mouth is. If you want more beautiful
+        things in the world, commission one.
+      </p>
+    </div>
+  </section>
+
+  <section class="section wrap makes">
+    <p class="eyebrow" data-reveal>What it makes</p>
+    <div class="makes__grid">
+      {known.disciplines.map((d, i) => (
+        <article class="make" data-reveal style={`--delay:${i * 120}ms`}>
+          <h2 class="h3">{d.name}</h2>
+          <p class="dim">{d.note}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section wrap give">
+    <div class="give__text">
+      <p class="eyebrow" data-reveal>Commission</p>
+      <h2 class="h2" data-reveal>Give once</h2>
+      <p class="dim give__note" data-reveal style="--delay:120ms">
+        Every gift goes into the next thing Known makes — a record, a staging,
+        a shoot. Nothing here buys you a ticket or unlocks anything. That is
+        the point of it.
+      </p>
+      <p class="dim give__note" data-reveal style="--delay:180ms">
+        Payment is handled by Stripe and we never see your card. Stripe emails
+        your receipt as soon as it goes through. For gifts larger than the form
+        allows, write to
+        <a href={`mailto:${known.contact}`}>{known.contact}</a> — we would
+        rather talk to you.
+      </p>
+    </div>
+
+    <div class="give__box" data-reveal style="--delay:140ms">
+      {known.open ? (
+        <form class="gift" data-gift>
+          <p class="gift__label">Choose an amount</p>
+          <div class="gift__amounts">
+            {known.suggestedCents.map((c) => (
+              <button
+                type="button"
+                class="gift__amount"
+                data-amount={c}
+                aria-pressed={c === known.defaultCents ? 'true' : 'false'}
+              >{dollars(c)}</button>
+            ))}
+          </div>
+          <label class="gift__other">
+            <span class="sr">Another amount, in dollars</span>
+            <span class="gift__sign" aria-hidden="true">$</span>
+            <input
+              type="number"
+              name="other"
+              min={known.minimumCents / 100}
+              max={known.maximumCents / 100}
+              step="1"
+              inputmode="numeric"
+              placeholder="Another amount"
+            />
+          </label>
+          <button class="gift__go" type="submit">Commission the work</button>
+          <p class="gift__msg" role="status" aria-live="polite"></p>
+          <p class="dim gift__fine">
+            Minimum {dollars(known.minimumCents)}, so card fees don’t eat the gift.
+          </p>
+        </form>
+      ) : (
+        <div class="soon">
+          <p class="eyebrow eyebrow--accent">Not yet</p>
+          <p class="soon__lede">Giving opens shortly.</p>
+          <p class="dim">
+            Put your address in anywhere on the site and you’ll hear when it does.
+          </p>
+        </div>
+      )}
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { capture, read, track } from '../../lib/attribution';
+
+  capture();
+
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-gift]')) {
+    const buttons = [...form.querySelectorAll<HTMLButtonElement>('.gift__amount')];
+    const other = form.querySelector<HTMLInputElement>('input[name=other]')!;
+    const go = form.querySelector<HTMLButtonElement>('.gift__go')!;
+    const msg = form.querySelector<HTMLParagraphElement>('.gift__msg')!;
+
+    let cents = Number(
+      buttons.find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset.amount ?? 5000
+    );
+
+    const select = (b: HTMLButtonElement | null) => {
+      for (const x of buttons) x.setAttribute('aria-pressed', String(x === b));
+    };
+
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        cents = Number(b.dataset.amount);
+        other.value = '';
+        select(b);
+      });
+    }
+    // Typing an amount deselects the presets, so what is charged is always
+    // the thing that looks selected.
+    other.addEventListener('input', () => {
+      const v = Number(other.value);
+      if (Number.isFinite(v) && v > 0) {
+        cents = Math.round(v * 100);
+        select(null);
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Opening checkout…';
+
+      try {
+        const attr = read();
+        track('known_give_start');
+        const res = await fetch('/api/known/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            amount_cents: cents,
+            utm_source: attr.utm_source,
+            utm_campaign: attr.utm_campaign,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as
+          { ok?: boolean; url?: string; error?: string };
+        if (body.ok && body.url) {
+          location.href = body.url;
+          return;
+        }
+        msg.dataset.state = 'err';
+        msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        go.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .top { padding-top: clamp(9rem, 20vw, 15rem); padding-bottom: clamp(1rem, 3vw, 2rem); }
+  .top__title { font-size: clamp(3.6rem, 13vw, 11rem); line-height: .9; margin: .6rem 0 0; }
+  .top__lede { margin-top: 2.2rem; max-width: 30ch; }
+
+  .argument { border-top: 1px solid var(--rule); padding-top: clamp(2.5rem, 6vw, 4rem); }
+  .argument__body { max-width: 58ch; }
+  .argument__body p { font-size: clamp(1rem, 1.5vw, 1.12rem); color: var(--bone-dim); }
+  .argument__body p + p { margin-top: 1.4rem; }
+  .argument__turn {
+    font-family: var(--display);
+    font-size: clamp(1.35rem, 3vw, 2.1rem);
+    line-height: 1.25;
+    color: var(--bone) !important;
+    margin-top: 2.4rem !important;
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2rem);
+  }
+
+  .makes__grid {
+    display: grid;
+    gap: clamp(2rem, 4vw, 3.5rem);
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    margin-top: 2.4rem;
+  }
+  .make { border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+  .make p { font-size: .95rem; margin-top: .8rem; max-width: 30ch; }
+
+  .give {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    align-items: start;
+    border-top: 1px solid var(--rule);
+    padding-top: clamp(2.5rem, 6vw, 4rem);
+  }
+  @media (max-width: 900px) { .give { grid-template-columns: 1fr; } }
+  .give__note { margin-top: 1.4rem; max-width: 46ch; font-size: .95rem; }
+  .give__note a { color: var(--blood-lift); }
+
+  .give__box {
+    border: 1px solid var(--rule);
+    padding: clamp(1.6rem, 4vw, 2.6rem);
+    position: sticky;
+    top: 6rem;
+  }
+  @media (max-width: 900px) { .give__box { position: static; } }
+
+  .gift__label {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-faint); margin: 0 0 1.2rem;
+  }
+  /* A grid, not wrapping flex: with four chips the last one wrapped to a row
+     of its own on a phone, which read as a different kind of button. */
+  .gift__amounts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5rem;
+    margin-bottom: .8rem;
+  }
+  @media (max-width: 520px) {
+    .gift__amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .gift__amount {
+    background: transparent; border: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.15rem; padding: .8rem .4rem;
+    cursor: pointer; transition: border-color .3s var(--ease), color .3s var(--ease);
+  }
+  .gift__amount[aria-pressed='true'] { border-color: var(--accent); color: var(--blood-lift); }
+  .gift__amount:hover { border-color: var(--bone-faint); }
+
+  .gift__other { display: flex; align-items: baseline; gap: .4rem; }
+  .gift__sign { font-family: var(--display); color: var(--bone-faint); }
+  .gift input {
+    width: 100%; background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.05rem; padding: .6rem .2rem;
+    transition: border-color .4s var(--ease); min-width: 0;
+  }
+  .gift input::placeholder { color: var(--bone-faint); }
+  .gift input:focus { outline: 0; border-color: var(--blood-lift); }
+
+  .gift__go {
+    width: 100%; margin-top: 1.8rem;
+    background: var(--accent); border: 1px solid var(--accent); color: #fff;
+    font-family: var(--sans); font-size: .74rem; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase; padding: 1rem 1.4rem;
+    cursor: pointer; transition: filter .3s var(--ease);
+  }
+  .gift__go:hover:not(:disabled) { filter: brightness(1.2); }
+  .gift__go:disabled { opacity: .5; cursor: progress; }
+  .gift__msg { font-size: .85rem; margin: .9rem 0 0; min-height: 1.2em; color: var(--bone-dim); }
+  .gift__msg[data-state='err'] { color: #d98080; }
+  .gift__fine { font-size: .8rem; margin-top: 1.1rem; }
+
+  .soon__lede {
+    font-family: var(--display); font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+    line-height: 1.2; margin: 0 0 1.2rem;
+  }
+  .soon .dim { font-size: .95rem; }
+</style>
