@@ -1,0 +1,282 @@
+---
+import Base from '../../layouts/Base.astro';
+import { strung } from '../../data/site';
+import { premiere, dollars } from '../../lib/premiere';
+export const prerender = true;
+
+const hero = '2020-12-17_CI4q_yUgNeX_01.jpg';
+---
+
+<Base
+  world="forest"
+  title="Strung — the online premiere"
+  description="Before His Name is Michael, there was Strung. Watch the 12-time award-winning short online, pay what you can, and every dollar goes to addiction recovery."
+  ogImage="/og/strung.jpg"
+  ogImageAlt="Strung — the online premiere"
+>
+  <section class="hero">
+    <div class="hero__art" data-parallax="0.06">
+      <img src={`/stills/strung/${hero}`} alt="" loading="eager" decoding="async" />
+    </div>
+    <div class="hero__scrim" aria-hidden="true"></div>
+    <div class="wrap hero__body">
+      <p class="eyebrow eyebrow--accent" data-reveal>The online premiere</p>
+      <h1 class="h2 hero__title" data-reveal style="--delay:80ms">
+        Before <em>His Name is Michael</em>,<br />there was <em>Strung</em>.
+      </h1>
+      <p class="lede hero__lede" data-reveal style="--delay:200ms">
+        Pay what you can. Every dollar goes to addiction recovery.
+      </p>
+    </div>
+  </section>
+
+  <section class="section wrap give">
+    <div class="give__text">
+      <p class="eyebrow" data-reveal>Why</p>
+      <p class="lede" data-reveal>{strung.closing}</p>
+      <p class="dim" data-reveal style="--delay:120ms">
+        {strung.statement}
+      </p>
+      <p class="dim" data-reveal style="--delay:180ms">
+        The premiere ran two nights at the historic State Theatre in Sioux Falls.
+        Tickets were free with a donation, and every dollar went to
+        {premiere.beneficiaries.map((b, i) => (
+          <>
+            {i > 0 ? ' and ' : ''}
+            <a href={b.href} target="_blank" rel="noopener">{b.name}</a>
+          </>
+        ))} for people who cannot afford treatment. This is that night, online.
+      </p>
+    </div>
+
+    <div class="give__box" data-reveal style="--delay:140ms">
+      {premiere.open ? (
+        <form class="pwyc" data-pwyc>
+          <p class="pwyc__label">Choose what to give</p>
+          <div class="pwyc__amounts">
+            {premiere.suggestedCents.map((c) => (
+              <button
+                type="button"
+                class="pwyc__amount"
+                data-amount={c}
+                aria-pressed={c === premiere.defaultCents ? 'true' : 'false'}
+              >{dollars(c)}</button>
+            ))}
+          </div>
+          <label class="pwyc__other">
+            <span class="sr">Another amount, in dollars</span>
+            <span class="pwyc__sign" aria-hidden="true">$</span>
+            <input
+              type="number"
+              name="other"
+              min={premiere.minimumCents / 100}
+              max="1000"
+              step="1"
+              inputmode="numeric"
+              placeholder="Another amount"
+            />
+          </label>
+          <label class="sr" for="pwyc-email">Email address</label>
+          <input id="pwyc-email" type="email" name="email" required autocomplete="email"
+                 placeholder="you@example.com" spellcheck="false" />
+          <button class="pwyc__go" type="submit">Watch Strung</button>
+          <p class="pwyc__msg" role="status" aria-live="polite"></p>
+          <p class="dim pwyc__note">
+            Minimum {dollars(premiere.minimumCents)}, so card fees don’t eat the gift.
+            Your link lasts {premiere.ticketDays} days. Payment is handled by Stripe;
+            we never see your card.
+          </p>
+        </form>
+      ) : (
+        <div class="soon">
+          <p class="eyebrow eyebrow--accent">Not yet</p>
+          <p class="soon__lede">The premiere opens after the trailer.</p>
+          <p class="dim">
+            We didn’t want the two announcements competing. Put your address in
+            anywhere on the site and you’ll get the date before it goes public.
+          </p>
+          <a class="link" href="/films/strung/">About the film <span aria-hidden="true">→</span></a>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="section wrap help__wrap">
+    <div class="help">
+      <p class="help__label">{strung.helpline.label}</p>
+      <p class="help__num"><a href={strung.helpline.href}>{strung.helpline.number}</a></p>
+      <p class="dim help__note">{strung.helpline.note}</p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { capture, read } from '../../lib/attribution';
+
+  capture();
+
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-pwyc]')) {
+    const buttons = [...form.querySelectorAll<HTMLButtonElement>('.pwyc__amount')];
+    const other = form.querySelector<HTMLInputElement>('input[name=other]')!;
+    const email = form.querySelector<HTMLInputElement>('input[type=email]')!;
+    const go = form.querySelector<HTMLButtonElement>('.pwyc__go')!;
+    const msg = form.querySelector<HTMLParagraphElement>('.pwyc__msg')!;
+
+    let cents = Number(
+      buttons.find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset.amount ?? 2500
+    );
+
+    const select = (b: HTMLButtonElement | null) => {
+      for (const x of buttons) x.setAttribute('aria-pressed', String(x === b));
+    };
+
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        cents = Number(b.dataset.amount);
+        other.value = '';
+        select(b);
+      });
+    }
+    // Typing an amount deselects the presets, so what is charged is always
+    // the thing that looks selected.
+    other.addEventListener('input', () => {
+      const v = Number(other.value);
+      if (Number.isFinite(v) && v > 0) {
+        cents = Math.round(v * 100);
+        select(null);
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!email.reportValidity()) return;
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Opening checkout…';
+
+      try {
+        const attr = read();
+        const res = await fetch('/api/premiere/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            amount_cents: cents,
+            email: email.value,
+            utm_source: attr.utm_source,
+            utm_campaign: attr.utm_campaign,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; url?: string; error?: string };
+        if (body.ok && body.url) {
+          location.href = body.url;
+          return;
+        }
+        msg.dataset.state = 'err';
+        msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+      } catch {
+        msg.dataset.state = 'err';
+        msg.textContent = 'Network trouble. Try again in a moment.';
+      } finally {
+        go.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 78svh;
+    display: grid;
+    align-content: end;
+    padding-bottom: clamp(3rem, 8vw, 6rem);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero__art { position: absolute; inset: -10% 0; z-index: -2; }
+  .hero__art img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: translateY(var(--shift, 0)) scale(1.1);
+    filter: brightness(.4) saturate(.7);
+  }
+  .hero__scrim {
+    position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(to bottom, rgba(13,23,18,.6), rgba(13,23,18,.3) 40%, var(--forest-deep) 96%);
+  }
+  .hero__title em { font-style: italic; }
+  .hero__lede { margin-top: 1.8rem; max-width: 30ch; }
+
+  .give {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    align-items: start;
+  }
+  @media (max-width: 900px) { .give { grid-template-columns: 1fr; } }
+  .give__text .lede { margin-bottom: 2rem; }
+  .give__text p + p { margin-top: 1.2rem; }
+  .give__text a { color: var(--blood-lift); }
+
+  .give__box {
+    border: 1px solid var(--rule);
+    padding: clamp(1.6rem, 4vw, 2.6rem);
+    position: sticky;
+    top: 6rem;
+  }
+  @media (max-width: 900px) { .give__box { position: static; } }
+
+  .pwyc__label {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-faint); margin: 0 0 1.2rem;
+  }
+  .pwyc__amounts { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
+  .pwyc__amount {
+    flex: 1 1 5rem;
+    background: transparent; border: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.15rem; padding: .8rem .4rem;
+    cursor: pointer; transition: border-color .3s var(--ease), color .3s var(--ease);
+  }
+  .pwyc__amount[aria-pressed='true'] { border-color: var(--accent); color: var(--blood-lift); }
+  .pwyc__amount:hover { border-color: var(--bone-faint); }
+
+  .pwyc__other { display: flex; align-items: baseline; gap: .4rem; margin-bottom: 1.4rem; }
+  .pwyc__sign { font-family: var(--display); color: var(--bone-faint); }
+  .pwyc input {
+    width: 100%; background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule); color: var(--bone);
+    font-family: var(--display); font-size: 1.05rem; padding: .6rem .2rem;
+    transition: border-color .4s var(--ease); min-width: 0;
+  }
+  .pwyc input::placeholder { color: var(--bone-faint); }
+  .pwyc input:focus { outline: 0; border-color: var(--blood-lift); }
+
+  .pwyc__go {
+    width: 100%; margin-top: 1.6rem;
+    background: var(--accent); border: 1px solid var(--accent); color: #fff;
+    font-family: var(--sans); font-size: .74rem; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase; padding: 1rem 1.4rem;
+    cursor: pointer; transition: filter .3s var(--ease);
+  }
+  .pwyc__go:hover:not(:disabled) { filter: brightness(1.2); }
+  .pwyc__go:disabled { opacity: .5; cursor: progress; }
+  .pwyc__msg { font-size: .85rem; margin: .9rem 0 0; min-height: 1.2em; color: var(--bone-dim); }
+  .pwyc__msg[data-state='err'] { color: #d98080; }
+  .pwyc__note { font-size: .8rem; margin-top: 1.2rem; }
+
+  .soon__lede {
+    font-family: var(--display); font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+    line-height: 1.2; margin: 0 0 1.2rem;
+  }
+  .soon .dim { font-size: .95rem; }
+  .soon .link { margin-top: 1.8rem; }
+
+  .help {
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2.4rem);
+    max-width: 46ch;
+  }
+  .help__label { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bone-faint); margin: 0; }
+  .help__num { font-family: var(--display); font-size: clamp(1.8rem, 4vw, 2.6rem); margin: .5rem 0; }
+  .help__num a { text-decoration: none; color: var(--blood-lift); }
+  .help__note { font-size: .9rem; margin: 0; }
+</style>

@@ -151,6 +151,21 @@ export const prerender = true;
     </div>
     <p class="dim future" data-reveal style="--delay:200ms">{strung.future}</p>
   </section>
+  <!-- ── the online premiere ── -->
+  <section class="section wrap premiere">
+    <p class="eyebrow eyebrow--accent" data-reveal>The online premiere</p>
+    <h2 class="h2" data-reveal>
+      Before <em>His Name is Michael</em>,<br />there was <em>Strung</em>.
+    </h2>
+    <p class="dim premiere__note" data-reveal style="--delay:120ms">
+      Watch the film online, pay what you can, and every dollar goes to
+      addiction recovery — the way the premiere did.
+    </p>
+    <a class="link" href="/premiere/" data-reveal style="--delay:200ms">
+      The premiere <span aria-hidden="true">&rarr;</span>
+    </a>
+  </section>
+
   <Notify
     film="strung"
     heading="Follow the feature."
@@ -296,6 +311,10 @@ export const prerender = true;
     border-bottom: 1px solid var(--rule);
   }
   .plain li .dim { font-family: var(--sans); font-size: .82rem; }
+
+  .premiere { border-top: 1px solid var(--rule); }
+  .premiere em { font-style: italic; }
+  .premiere__note { margin: 1.5rem 0 2rem; max-width: 44ch; }
 
   .give__lede { max-width: 40ch; margin-bottom: 3rem; }
   .help {
