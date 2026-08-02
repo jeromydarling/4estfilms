@@ -169,6 +169,19 @@ export const hnim = {
       text: 'Clear skies, sixty degrees, and a horse named “Hollywood.” The last frames of principal photography, and the widest the film ever breathes.',
     },
   ],
+  // A cue from the score, rendered as soon as `src` names a real file.
+  // Encode to /media/audio/<name>.opus + .m4a and set src to the base
+  // without extension; the player picks per browser. Nothing renders while
+  // this is null, so it can ship ahead of the track.
+  track: null as null | {
+    src: string;
+    title: string;
+    artist: string;
+    plate: string;
+    lyric?: string;
+    note?: string;
+  },
+
   // One curated closing gallery. Nothing here repeats a production plate,
   // and nothing here spoils a beat.
   gallery: [

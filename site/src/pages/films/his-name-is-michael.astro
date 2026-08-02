@@ -4,6 +4,7 @@ import { hnim } from '../../data/site';
 import { hnimSchema } from '../../data/schema';
 import Notify from '../../components/Notify.astro';
 import Trailer from '../../components/Trailer.astro';
+import Track from '../../components/Track.astro';
 
 const hero = 'key/hero-prayer.webp';
 export const prerender = true;
@@ -78,6 +79,19 @@ export const prerender = true;
       <p class="question__q">{hnim.question}</p>
     </blockquote>
   </section>
+
+  <!-- ── the score ── renders as soon as hnim.track names a real file -->
+  {hnim.track && (
+    <Track
+      src={hnim.track.src}
+      title={hnim.track.title}
+      artist={hnim.track.artist}
+      plate={hnim.track.plate}
+      lyric={hnim.track.lyric}
+      note={hnim.track.note}
+      film="his-name-is-michael"
+    />
+  )}
 
   <!-- ── credits ── -->
   <section class="section wrap">

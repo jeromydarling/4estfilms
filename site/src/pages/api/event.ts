@@ -14,6 +14,8 @@ const NAMES = new Set([
   'trailer_complete',
   'trailer_youtube_out',
   'press_kit_download',
+  'track_start',
+  'track_complete',
 ]);
 
 const str = (v: unknown, max: number) =>

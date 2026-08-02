@@ -1,0 +1,265 @@
+---
+/**
+ * A cue from the score, played in page.
+ *
+ * The one thing on this site people might come back to. Stills get looked
+ * at once; a song gets replayed — and His Name is Michael is a musical
+ * whose writer has ten albums behind him, which is a whole discovery
+ * surface the film is not otherwise using.
+ *
+ * The audio streams from R2 through /media/, the same path as the trailer,
+ * so nothing large sits in the Worker bundle.
+ */
+interface Props {
+  /** Base key under /media/, without extension. Variants are tried in order. */
+  src: string;
+  title: string;
+  artist: string;
+  /** Still shown behind the player. */
+  plate: string;
+  /** A line or two, the way a lyric sheet would carry it. */
+  lyric?: string;
+  note?: string;
+  film?: string;
+}
+const { src, title, artist, plate, lyric, note, film } = Astro.props;
+---
+
+<section class="track" data-src={src} data-film={film}>
+  <div class="track__art" aria-hidden="true">
+    <img src={plate} alt="" loading="lazy" decoding="async" />
+  </div>
+  <div class="wrap track__inner">
+    <div class="track__body">
+      <p class="eyebrow eyebrow--accent" data-reveal>From the score</p>
+      <h2 class="h2 track__title" data-reveal>{title}</h2>
+      <p class="track__artist" data-reveal style="--delay:80ms">{artist}</p>
+      {lyric && (
+        <blockquote class="track__lyric" data-reveal style="--delay:160ms">
+          <p set:html={lyric.replace(/\n/g, '<br />')} />
+        </blockquote>
+      )}
+      {note && <p class="dim track__note" data-reveal style="--delay:220ms">{note}</p>}
+    </div>
+
+    <div class="track__player" data-reveal style="--delay:120ms">
+      <button class="track__play" type="button" aria-label={`Play ${title}`}>
+        <span class="track__disc" aria-hidden="true">
+          <svg class="track__icon track__icon--play" viewBox="0 0 24 24" width="22" height="22"
+               fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          <svg class="track__icon track__icon--pause" viewBox="0 0 24 24" width="22" height="22"
+               fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
+        </span>
+      </button>
+
+      <div class="track__bar">
+        <!-- A real range input, so it is keyboard- and screen-reader-operable.
+             A div with a click handler would not be. -->
+        <label class="sr" for={`seek-${src.replace(/\W/g, '')}`}>Seek</label>
+        <input
+          id={`seek-${src.replace(/\W/g, '')}`}
+          class="track__seek"
+          type="range"
+          min="0"
+          max="1000"
+          value="0"
+          step="1"
+          disabled
+        />
+        <p class="track__time"><span class="track__at">0:00</span> <span class="dim">/</span> <span class="track__dur">—:—</span></p>
+      </div>
+
+      <audio class="track__audio" preload="none"></audio>
+      <p class="track__err" role="alert" hidden>This track can’t play in your browser.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { capture, track as report } from '../lib/attribution';
+
+  capture();
+
+  const clock = (s: number) => {
+    if (!isFinite(s)) return '—:—';
+    const m = Math.floor(s / 60);
+    return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>('.track')) {
+    const audio = root.querySelector<HTMLAudioElement>('.track__audio')!;
+    const play = root.querySelector<HTMLButtonElement>('.track__play')!;
+    const seek = root.querySelector<HTMLInputElement>('.track__seek')!;
+    const at = root.querySelector<HTMLSpanElement>('.track__at')!;
+    const dur = root.querySelector<HTMLSpanElement>('.track__dur')!;
+    const err = root.querySelector<HTMLParagraphElement>('.track__err')!;
+    const base = root.dataset.src!;
+    const film = root.dataset.film || undefined;
+
+    // Ordered by preference. Opus is much smaller at the same quality;
+    // Safari and anything without it fall through to AAC, then MP3.
+    const queue = [`${base}.m4a`, `${base}.mp3`];
+    if (audio.canPlayType('audio/ogg; codecs="opus"') !== '') {
+      queue.unshift(`${base}.opus`);
+    }
+
+    let started = false;
+    let scrubbing = false;
+
+    const fail = () => {
+      const next = queue.shift();
+      if (next) {
+        audio.src = next;
+        audio.load();
+        void audio.play().catch(() => {});
+        return;
+      }
+      root.dataset.playing = '';
+      err.hidden = false;
+    };
+
+    play.addEventListener('click', () => {
+      if (!audio.src) audio.src = queue.shift()!;
+      if (audio.paused) {
+        void audio.play().catch(() => {});
+        if (!started) {
+          started = true;
+          report('track_start', film ? { film } : {});
+        }
+      } else {
+        audio.pause();
+      }
+    });
+
+    audio.addEventListener('play', () => { root.dataset.playing = 'true'; });
+    audio.addEventListener('pause', () => { root.dataset.playing = ''; });
+    audio.addEventListener('error', fail);
+    audio.addEventListener('ended', () => {
+      root.dataset.playing = '';
+      report('track_complete', film ? { film } : {});
+    });
+
+    // Both events, and neither is enough alone: a streamed Ogg reports
+    // Infinity at loadedmetadata and only settles on a real number when a
+    // later durationchange arrives. Listening to just one leaves the
+    // scrubber permanently dead.
+    const usable = () => isFinite(audio.duration) && audio.duration > 0;
+    const sizeUp = () => {
+      if (!usable()) return;
+      seek.disabled = false;
+      dur.textContent = clock(audio.duration);
+    };
+    audio.addEventListener('loadedmetadata', sizeUp);
+    audio.addEventListener('durationchange', sizeUp);
+
+    audio.addEventListener('timeupdate', () => {
+      at.textContent = clock(audio.currentTime);
+      if (scrubbing || !usable()) return;
+      sizeUp();
+      seek.value = String((audio.currentTime / audio.duration) * 1000);
+    });
+
+    // Dragging must not fight the playhead, so updates are suspended while
+    // the thumb is held and applied on release.
+    seek.addEventListener('pointerdown', () => { scrubbing = true; });
+    seek.addEventListener('input', () => {
+      if (usable()) at.textContent = clock((Number(seek.value) / 1000) * audio.duration);
+    });
+    const commit = () => {
+      if (usable()) audio.currentTime = (Number(seek.value) / 1000) * audio.duration;
+      scrubbing = false;
+    };
+    seek.addEventListener('pointerup', commit);
+    seek.addEventListener('change', commit);
+  }
+</script>
+
+<style>
+  .track {
+    position: relative;
+    padding-block: clamp(4rem, 10vw, 8rem);
+    overflow: hidden;
+    isolation: isolate;
+    border-block: 1px solid var(--rule);
+  }
+  .track__art { position: absolute; inset: 0; z-index: -2; }
+  .track__art img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: grayscale(.5) brightness(.32);
+    transform: scale(1.05);
+    transition: filter 1.2s var(--ease);
+  }
+  .track[data-playing='true'] .track__art img { filter: grayscale(.15) brightness(.42); }
+  .track::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(100deg, rgba(8,8,10,.9) 10%, rgba(8,8,10,.55) 60%, transparent);
+  }
+
+  .track__inner {
+    display: grid;
+    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    align-items: center;
+  }
+  @media (max-width: 860px) { .track__inner { grid-template-columns: 1fr; } }
+
+  .track__title { margin-bottom: .6rem; }
+  .track__artist {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-dim); margin: 0;
+  }
+  .track__lyric {
+    margin: 2.2rem 0 0;
+    border-left: 2px solid var(--accent);
+    padding-left: clamp(1.2rem, 3vw, 2.2rem);
+  }
+  .track__lyric p {
+    font-family: var(--display);
+    font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+    line-height: 1.35;
+    margin: 0; max-width: 30ch;
+  }
+  .track__note { margin-top: 1.8rem; font-size: .9rem; max-width: 42ch; }
+
+  .track__player { display: flex; align-items: center; gap: clamp(1rem, 2.5vw, 1.8rem); }
+  .track__play {
+    flex: none; background: transparent; border: 0; padding: 0;
+    cursor: pointer; color: var(--bone);
+  }
+  .track__disc {
+    display: grid; place-content: center;
+    width: clamp(3.6rem, 6vw, 5rem); aspect-ratio: 1;
+    border: 1px solid rgba(242,237,227,.45); border-radius: 50%;
+    background: rgba(8,8,10,.3); backdrop-filter: blur(3px);
+    transition: background .4s var(--ease), border-color .4s var(--ease), transform .4s var(--ease);
+  }
+  .track__play:hover .track__disc,
+  .track__play:focus-visible .track__disc {
+    background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.06);
+  }
+  .track__icon--play { padding-left: .16em; }
+  .track__icon--pause { display: none; }
+  .track[data-playing='true'] .track__icon--play { display: none; }
+  .track[data-playing='true'] .track__icon--pause { display: block; }
+
+  .track__bar { flex: 1 1 auto; min-width: 0; }
+  .track__seek {
+    width: 100%; height: 2px; appearance: none; background: var(--rule);
+    cursor: pointer; margin: 0;
+  }
+  .track__seek::-webkit-slider-thumb {
+    appearance: none; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--blood-lift); border: 0; cursor: grab;
+  }
+  .track__seek::-moz-range-thumb {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--blood-lift); border: 0; cursor: grab;
+  }
+  .track__seek:disabled { opacity: .5; cursor: default; }
+  .track__seek:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+  .track__time {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .1em;
+    color: var(--bone-dim); margin: .8rem 0 0; font-variant-numeric: tabular-nums;
+  }
+  .track__err { font-size: .85rem; color: #d98080; margin: .8rem 0 0; }
+</style>
