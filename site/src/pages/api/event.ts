@@ -16,6 +16,7 @@ const NAMES = new Set([
   'press_kit_download',
   'track_start',
   'track_complete',
+  'screening_request',
 ]);
 
 const str = (v: unknown, max: number) =>

@@ -166,6 +166,20 @@ export const prerender = true;
     <p class="wrap dim credit">Behind-the-scenes photography by Ryan McBoyle.</p>
   </section>
 
+  <!-- ── community screenings ── -->
+  <section class="section wrap bring">
+    <p class="eyebrow eyebrow--accent" data-reveal>Community screenings</p>
+    <h2 class="h2" data-reveal>Bring it to your city.</h2>
+    <p class="dim bring__note" data-reveal style="--delay:120ms">
+      The film plays where people ask for it. Put your city on the map — and
+      if you want to be the one who organises it, we hand you the venues and
+      the letter.
+    </p>
+    <a class="link" href="/screenings/" data-reveal style="--delay:200ms">
+      Ask for a screening <span aria-hidden="true">&rarr;</span>
+    </a>
+  </section>
+
   <Notify
     film="his-name-is-michael"
     heading="Know when it opens."
@@ -366,6 +380,9 @@ export const prerender = true;
   }
   .grid__cell:hover img { filter: none; transform: scale(1.05); }
   .credit { margin-top: 1.5rem; font-size: .8rem; }
+
+  .bring { border-top: 1px solid var(--rule); }
+  .bring__note { margin: 1.5rem 0 2rem; max-width: 46ch; }
 
   .close { text-align: center; }
   .close .lede { margin: 1.5rem auto 2.5rem; }
