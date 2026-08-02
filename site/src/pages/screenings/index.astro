@@ -117,18 +117,20 @@ export const prerender = true;
         ok?: boolean;
         threshold: number;
         cities: { slug: string; city: string; region: string | null; country: string; requests: number; hosts: number }[];
+        open?: { slug: string; city: string; region: string | null; country: string }[];
         totals: { cities: number; requests: number };
       };
-      if (!d.ok || !d.cities.length) {
-        board.innerHTML =
-          '<p class="dim board__empty">No city has asked yet. Yours can be the first.</p>';
+      if (!d.ok) {
+        board.innerHTML = '<p class="dim board__empty">Could not load the list just now.</p>';
         return;
       }
       const label = (c: { city: string; region: string | null; country: string }) =>
         [c.city, c.region, c.country !== 'US' ? c.country : null].filter(Boolean).join(', ');
 
-      board.innerHTML = `
-        <p class="dim board__total">${d.totals.requests} ${d.totals.requests === 1 ? 'person' : 'people'} across ${d.totals.cities} ${d.totals.cities === 1 ? 'city' : 'cities'}.</p>
+      // Cities with demand, then cities merely open. Kept visually apart so
+      // an open city is never mistaken for one that has people behind it.
+      const asking = d.cities.length
+        ? `<p class="dim board__total">${d.totals.requests} ${d.totals.requests === 1 ? 'person' : 'people'} across ${d.totals.cities} ${d.totals.cities === 1 ? 'city' : 'cities'}.</p>
         <ol class="rows">
           ${d.cities
             .map(
@@ -142,7 +144,23 @@ export const prerender = true;
               </li>`
             )
             .join('')}
-        </ol>`;
+        </ol>`
+        : '<p class="dim board__empty">No one has asked yet. Yours can be the first city on this list.</p>';
+
+      const openCities = d.open ?? [];
+      const open = openCities.length
+        ? `<div class="open">
+             <p class="open__label">Open, waiting on a first name</p>
+             <ul class="open__list">
+               ${openCities
+                 .map((c) => `<li><a href="/screenings/${c.slug}/">${label(c)}</a></li>`)
+                 .join('')}
+             </ul>
+             <p class="dim open__note">Not listed? Type it in above — any city works.</p>
+           </div>`
+        : '';
+
+      board.innerHTML = asking + open;
     } catch {
       board.innerHTML = '<p class="dim board__empty">Could not load the list just now.</p>';
     }
@@ -311,4 +329,25 @@ export const prerender = true;
     font-family: var(--mono); font-size: .56rem; letter-spacing: .18em;
     text-transform: uppercase; color: var(--lantern);
   }
+
+  [data-board] .open { margin-top: clamp(2.5rem, 6vw, 4rem); }
+  [data-board] .open__label {
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--bone-faint); margin: 0 0 1.2rem;
+  }
+  [data-board] .open__list {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: .5rem 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  }
+  [data-board] .open__list a {
+    display: block; padding: .45rem 0; text-decoration: none;
+    color: var(--bone-dim); font-size: .93rem;
+    border-bottom: 1px solid transparent;
+    transition: color .3s var(--ease), border-color .3s var(--ease);
+  }
+  [data-board] .open__list a:hover {
+    color: var(--blood-lift); border-bottom-color: var(--rule);
+  }
+  [data-board] .open__note { margin-top: 1.8rem; font-size: .86rem; }
 </style>

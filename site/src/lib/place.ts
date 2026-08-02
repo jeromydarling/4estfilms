@@ -52,12 +52,21 @@ const fold = (s: string) =>
     .toLowerCase()
     .replace(/[.'’]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+    .trim()
+    // "Saint Paul" and "St. Paul" are one city and have to be one bucket.
+    // Both spellings are common enough that leaving them apart would split
+    // two of the larger Midwest markets down the middle.
+    .replace(/\bsaint\b/g, 'st');
 
 const titleCase = (s: string) =>
   s
     .split(/\s+/)
-    .map((w) => (w.length <= 2 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1)))
+    .map((w) => {
+      // fold() has already turned "Saint" into "st"; put the stop back so
+      // it reads as a place name rather than a typo.
+      if (w === 'st') return 'St.';
+      return w.length <= 2 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1);
+    })
     .join(' ');
 
 /**
