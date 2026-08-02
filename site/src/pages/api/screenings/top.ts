@@ -22,6 +22,16 @@ export const GET: APIRoute = async () => {
   }
 
   try {
+    type Row = {
+      slug: string;
+      city: string;
+      region: string | null;
+      country: string;
+      status: string;
+      requests: number;
+      hosts: number;
+    };
+
     const rows = await db
       .prepare(
         `SELECT c.slug, c.city, c.region, c.country, c.status,
@@ -36,15 +46,27 @@ export const GET: APIRoute = async () => {
           LIMIT ?2`
       )
       .bind(screenings.film, screenings.topCities)
-      .all<{
-        slug: string;
-        city: string;
-        region: string | null;
-        country: string;
-        status: string;
-        requests: number;
-        hosts: number;
-      }>();
+      .all<Row>();
+
+    // Cities that exist but nobody has asked for yet. These are the seeded
+    // ones, and they are the answer to the empty-map problem: a visitor
+    // facing a blank text field has to know what to type and believe it
+    // will lead anywhere, whereas one who sees their own city listed just
+    // clicks it. Returned separately from `cities` so the page never shows
+    // a zero as though it were demand.
+    const openRows = await db
+      .prepare(
+        `SELECT c.slug, c.city, c.region, c.country, c.status,
+                0 AS requests, 0 AS hosts
+           FROM screening_cities c
+           LEFT JOIN screening_requests r ON r.city_id = c.id
+          WHERE c.film = ?1
+       GROUP BY c.id
+         HAVING COUNT(r.id) = 0
+       ORDER BY c.region, c.city`
+      )
+      .bind(screenings.film)
+      .all<Row>();
 
     const totals = await db
       .prepare(
@@ -61,6 +83,7 @@ export const GET: APIRoute = async () => {
         ok: true,
         threshold: screenings.threshold,
         cities: rows.results ?? [],
+        open: openRows.results ?? [],
         totals: { cities: totals?.cities ?? 0, requests: totals?.requests ?? 0 },
       }),
       {

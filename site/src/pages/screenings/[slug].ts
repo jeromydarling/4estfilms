@@ -79,13 +79,23 @@ export const GET: APIRoute = async ({ params }) => {
   // The letter. Pre-written because "email a cinema" is a much bigger ask
   // than it sounds — most people stall on the first sentence — and because
   // the number in it is the argument.
+  //
+  // Until the number is an argument, it is left out. A letter that opens
+  // "3 people have asked" makes the case against itself, and a seeded city
+  // sitting at zero would otherwise generate one saying nobody has.
+  const DEMAND_WORTH_STATING = 10;
+  const demand =
+    requests >= DEMAND_WORTH_STATING
+      ? `${requests} people in ${label} have asked for a screening here through the film's website, and I've offered to help organise it.`
+      : `I've offered to help organise it locally, and there's a page collecting names in ${label}: ${url}`;
+
   const letter = `Subject: One-night screening enquiry — His Name is Michael (2026)
 
 Hello,
 
 I'm writing to ask whether you would consider a one-night screening of an independent feature called His Name is Michael — a supernatural Western musical from 4est Films, set in Virginia City, Nevada and filmed entirely in South Dakota.
 
-${requests} ${requests === 1 ? 'person' : 'people'} in ${label} ${requests === 1 ? 'has' : 'have'} asked for a screening here through the film's website, and I've offered to help organise it.
+${demand}
 
 The company's previous film, Strung, won twelve awards across eight festivals, and its premiere raised funds for addiction recovery.
 
@@ -139,6 +149,8 @@ Thank you for your time,
   .count b{font-family:'Iowan Old Style',Georgia,serif;font-weight:400;
            font-size:clamp(3rem,10vw,5rem);line-height:1;color:var(--blood-lift)}
   .count span{color:var(--bone-dim)}
+  .count__none{font-family:'Iowan Old Style',Georgia,serif;font-size:clamp(1.3rem,3.4vw,1.9rem);
+               color:var(--bone)}
   .bar{height:3px;background:var(--rule);margin:1rem 0 .8rem}
   .bar i{display:block;height:100%;background:var(--blood);width:${pct}%}
   .status{font-size:.92rem;color:var(--bone-dim);margin:0}
@@ -171,9 +183,13 @@ Thank you for your time,
     <p class="eyebrow accent">Community screening</p>
     <h1>${esc(label)}</h1>
     <div class="count">
-      <b>${requests}</b>
-      <span>${requests === 1 ? 'person has' : 'people have'} asked for
-      <em>${esc(hnim.title)}</em> here</span>
+      ${
+        requests === 0
+          ? `<span class="count__none">No one has asked here yet. Be the first.</span>`
+          : `<b>${requests}</b>
+             <span>${requests === 1 ? 'person has' : 'people have'} asked for
+             <em>${esc(hnim.title)}</em> here</span>`
+      }
     </div>
     <div class="bar"><i></i></div>
     <p class="status">${esc(screenings.threshold)} is where we start working a city. ${esc(statusLine)}</p>

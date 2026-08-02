@@ -113,6 +113,17 @@ jobs:
             d1 execute 4estfilms-db --${{ inputs.target }}
             --file migrations/0006_screenings.sql
 
+      - name: Apply 0007 — seed Midwest cities
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0007_seed_midwest.sql
+
       - name: Confirm schema
         uses: cloudflare/wrangler-action@v3
         with:
