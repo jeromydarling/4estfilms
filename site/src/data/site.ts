@@ -155,7 +155,7 @@ export const hnim = {
     },
     {
       title: 'The schoolroom',
-      plates: ['day7_BAT06197.webp', 'day7_DSC04556.webp', 'day6_DSC04094.webp'],
+      plates: ['day7_DSC04556.webp', 'day6_DSC04094.webp', 'day8_DSC04791.webp'],
       text: 'Twenty child actors in a period-accurate schoolroom, reciting verse. The production built the sequence around them, and it became the warmest passage in a film that spends much of its time in the dark.',
     },
     {
@@ -181,7 +181,7 @@ export const hnim = {
     'day6_DSC04141.webp',
     'day6_DSC04165.webp',
     'day6_DSC04202.webp',
-    'day8_DSC04791.webp',
+    'day9_DSC04934.webp',
   ],
 };
 

@@ -1,0 +1,250 @@
+---
+import Base from '../../layouts/Base.astro';
+import { company, strung, hnim, people } from '../../data/site';
+import { organization, strungSchema, hnimSchema } from '../../data/schema';
+import { pressContact, pressStills } from '../../data/press';
+export const prerender = true;
+---
+
+<Base
+  title="Press — 4est Films"
+  description="Loglines, synopses, credits, awards, stills and contact for His Name is Michael and Strung. One page, everything a programmer or journalist needs."
+  ogImage="/og/press.jpg"
+  ogImageAlt="4est Films press kit"
+  schema={[organization, hnimSchema, strungSchema]}
+>
+  <section class="top wrap">
+    <p class="eyebrow" data-reveal>{company.line}</p>
+    <h1 class="h2" data-reveal style="--delay:80ms">Press</h1>
+    <p class="dim top__note" data-reveal style="--delay:140ms">
+      Everything below is cleared for publication. For interviews, screeners,
+      or print-resolution files, write to
+      <a href={`mailto:${pressContact.email}`}>{pressContact.email}</a>.
+    </p>
+    <p data-reveal style="--delay:200ms">
+      <a class="link" href="/press/kit.zip" download data-kit>
+        Download the kit <span aria-hidden="true">↓</span>
+      </a>
+    </p>
+  </section>
+
+  <!-- ── His Name is Michael ── -->
+  <section class="section wrap film">
+    <div class="film__head">
+      <p class="eyebrow eyebrow--accent" data-reveal>{hnim.release}</p>
+      <h2 class="h2" data-reveal>{hnim.title}</h2>
+    </div>
+    <div class="film__body">
+      <p class="lede" data-reveal>{hnim.description}</p>
+
+      <dl class="facts" data-reveal>
+        <div><dt>Logline</dt><dd>{hnim.logline}</dd></div>
+        <div><dt>Genre</dt><dd>{hnim.genre}</dd></div>
+        <div><dt>Setting</dt><dd>{hnim.setting}</dd></div>
+        <div><dt>Shot in</dt><dd>South Dakota, United States</dd></div>
+        <div><dt>Release</dt><dd>{hnim.release}</dd></div>
+        <div>
+          <dt>Structure</dt>
+          <dd>
+            A frame narrative. In {hnim.narrative.frame.year}, {hnim.narrative.frame.place.toLowerCase()};
+            the story she tells is set in {hnim.narrative.tale.year}.
+          </dd>
+        </div>
+        <div><dt>Premise</dt><dd>{hnim.premise}</dd></div>
+        <div><dt>Origin</dt><dd>{hnim.origin}</dd></div>
+      </dl>
+
+      <p class="eyebrow credits__label" data-reveal>Credits</p>
+      <dl class="credits" data-reveal>
+        {hnim.key.map(([role, who]) => (
+          <div class="credits__row"><dt>{role}</dt><dd>{who}</dd></div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <!-- ── Strung ── -->
+  <section class="section wrap film">
+    <div class="film__head">
+      <p class="eyebrow eyebrow--accent" data-reveal>{strung.year} · {strung.runtimeNote}</p>
+      <h2 class="h2" data-reveal>{strung.title}</h2>
+    </div>
+    <div class="film__body">
+      <p class="lede" data-reveal>{strung.logline}</p>
+
+      <dl class="facts" data-reveal>
+        <div><dt>Awards</dt><dd>{strung.totalWins} across {strung.festivalCount} festivals</dd></div>
+        <div>
+          <dt>Selected honors</dt>
+          <dd>
+            <ul class="bare">
+              {strung.featuredAwards.map(([prize, fest]) => (
+                <li>{prize} — <span class="dim">{fest}</span></li>
+              ))}
+            </ul>
+            <a class="link facts__link" href={strung.imdbAwards} target="_blank" rel="noopener">
+              Full list on IMDb <span aria-hidden="true">→</span>
+            </a>
+          </dd>
+        </div>
+        <div><dt>Background</dt><dd>{strung.statement}</dd></div>
+        <div><dt>In development</dt><dd>{strung.future}</dd></div>
+      </dl>
+
+      <p class="eyebrow credits__label" data-reveal>Credits</p>
+      <dl class="credits" data-reveal>
+        <div class="credits__row"><dt>Directed by</dt><dd>{strung.directors.join(', ')}</dd></div>
+        <div class="credits__row"><dt>Co-directed by</dt><dd>{strung.coDirectors.join(', ')}</dd></div>
+        <div class="credits__row"><dt>Written by</dt><dd>{strung.writers.join(', ')}</dd></div>
+        <div class="credits__row"><dt>Produced by</dt><dd>{strung.producers.join(', ')}</dd></div>
+        {strung.cast.map(([who, role]) => (
+          <div class="credits__row"><dt>{role}</dt><dd>{who}</dd></div>
+        ))}
+        {strung.crew.map(([role, who]) => (
+          <div class="credits__row"><dt>{role}</dt><dd>{who}</dd></div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <!-- ── stills ── -->
+  <section class="section">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>Stills</p>
+      <h2 class="h2" data-reveal>Cleared for publication</h2>
+      <p class="dim stills__note" data-reveal style="--delay:120ms">
+        {pressStills.length} images from <em>His Name is Michael</em>, at 2160px.
+        Click any to open the full file, or take them all in the kit above.
+        Print resolution on request. Behind-the-scenes photography by Ryan McBoyle.
+      </p>
+    </div>
+    <div class="grid">
+      {pressStills.map((s, i) => (
+        <figure class="grid__cell" data-reveal style={`--delay:${(i % 5) * 60}ms`}>
+          <a href={s.src} download>
+            <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
+          </a>
+        </figure>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── people ── -->
+  <section class="section wrap">
+    <p class="eyebrow" data-reveal>The company</p>
+    <div class="people">
+      {people.map((p, i) => (
+        <article class="person" data-reveal style={`--delay:${i * 120}ms`}>
+          <h3 class="h3">{p.name}</h3>
+          <p class="eyebrow person__role">{p.roles}</p>
+          <p class="dim">{p.bio}</p>
+          <p class="person__links">
+            {p.site && <a href={p.site} class="link">Site</a>}
+            {p.imdb && <a href={p.imdb} class="link">IMDb</a>}
+          </p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section wrap contact">
+    <p class="eyebrow" data-reveal>Contact</p>
+    <h2 class="h2" data-reveal>
+      <a href={`mailto:${pressContact.email}`}>{pressContact.email}</a>
+    </h2>
+    <p class="dim" data-reveal style="--delay:120ms">
+      Interviews, screeners, festival enquiries and print-resolution files.
+    </p>
+  </section>
+</Base>
+
+<script>
+  import { track } from '../../lib/attribution';
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('[data-kit]')) {
+    a.addEventListener('click', () => track('press_kit_download'));
+  }
+</script>
+
+<style>
+  .top { padding-top: clamp(8rem, 18vw, 13rem); padding-bottom: clamp(1rem, 3vw, 2rem); }
+  .top__note { margin: 1.5rem 0 2rem; max-width: 52ch; }
+  .top__note a, .contact a { color: var(--blood-lift); }
+
+  .film {
+    display: grid;
+    gap: clamp(1.5rem, 4vw, 4rem);
+    grid-template-columns: minmax(0, .5fr) minmax(0, 1.5fr);
+    align-items: start;
+    border-top: 1px solid var(--rule);
+    padding-top: clamp(2.5rem, 6vw, 4rem);
+  }
+  @media (max-width: 860px) { .film { grid-template-columns: 1fr; } }
+  .film__head { position: sticky; top: 6rem; }
+  @media (max-width: 860px) { .film__head { position: static; } }
+  .film .lede { margin-bottom: 2.5rem; max-width: 40ch; }
+
+  .facts { margin: 0 0 3rem; }
+  .facts > div {
+    display: grid;
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+    gap: 1rem 2rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  @media (max-width: 640px) { .facts > div { grid-template-columns: 1fr; gap: .3rem; } }
+  .facts dt, .credits dt {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--bone-faint);
+    margin: 0;
+  }
+  .facts dd { margin: 0; color: var(--bone-dim); font-size: .95rem; }
+  .facts__link { margin-top: 1rem; }
+  .bare { list-style: none; margin: 0 0 .5rem; padding: 0; }
+  .bare li { padding: .2rem 0; }
+
+  .credits__label { margin-bottom: 1rem; }
+  .credits { margin: 0; }
+  .credits__row {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+    gap: 1rem 2rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  @media (max-width: 640px) { .credits__row { grid-template-columns: 1fr; gap: .2rem; } }
+  .credits dd { margin: 0; font-family: var(--display); font-size: 1.05rem; }
+
+  .stills__note { margin-top: 1.2rem; max-width: 56ch; font-size: .95rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: .5rem;
+    margin-top: 2rem;
+    padding-inline: .5rem;
+  }
+  .grid__cell { margin: 0; overflow: hidden; }
+  .grid__cell img {
+    width: 100%; aspect-ratio: 3 / 4; object-fit: cover;
+    filter: brightness(.85);
+    transition: filter .6s var(--ease), transform .8s var(--ease);
+  }
+  .grid__cell:hover img { filter: none; transform: scale(1.04); }
+
+  .people {
+    display: grid;
+    gap: clamp(2.5rem, 5vw, 4rem);
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    margin-top: 2.5rem;
+  }
+  .person { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+  .person__role { margin: .8rem 0 1rem; }
+  .person p { font-size: .95rem; }
+  .person__links { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
+
+  .contact { text-align: center; }
+  .contact a { text-decoration: none; }
+  .contact .dim { margin: 1.5rem auto 0; }
+</style>
