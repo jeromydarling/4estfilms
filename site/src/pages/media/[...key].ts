@@ -13,6 +13,12 @@ const MIME: Record<string, string> = {
   webp: 'image/webp',
   mp3: 'audio/mpeg',
   m4a: 'audio/mp4',
+  // Served as audio/ogg rather than audio/opus: Safari and older Firefox
+  // will not touch the latter, and the codecs are in the container anyway.
+  opus: 'audio/ogg',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  wav: 'audio/wav',
 };
 
 /**
