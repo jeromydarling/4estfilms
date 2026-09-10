@@ -136,7 +136,7 @@ export const hnim = {
     ['Edited by', 'Aaron Berger'],
     ['Sound Mixer', 'Zak Rivers'],
     ['Original Music by', 'Jeromy Darling & Kurt Larson'],
-    ['Original Score by', 'Justuce Johnson'],
+    ['Original Score by', 'Justus Johnson'],
     ['Behind-the-Scenes Photography', 'Ryan McBoyle'],
   ] as [string, string][],
   // Production notes. `plates` names the three stills shown beside each

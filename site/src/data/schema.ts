@@ -81,6 +81,6 @@ export const hnimSchema = {
     { '@type': 'Person', name: 'Wyatt Darling', characterName: 'The Boy' },
     { '@type': 'Person', name: 'Joseph Bezenek', characterName: 'The King of Virginia City' },
   ],
-  musicBy: [person('Jeromy Darling'), person('Kurt Larson'), person('Justuce Johnson')],
+  musicBy: [person('Jeromy Darling'), person('Kurt Larson'), person('Justus Johnson')],
   productionCompany: { '@id': `${SITE}/#organization` },
 };
