@@ -61,7 +61,15 @@ export const POST: APIRoute = async ({ request, url }) => {
   const event = await getEvent(String(body.slug ?? ''));
   if (!event) return json({ ok: false, error: 'No such stop.' }, 404);
 
-  const queue = Array.isArray(body.queue) ? body.queue.slice(0, 500) : [];
+  // Sales before check-ins, each in the order they happened. The device keys
+  // its queue by UUID, so it arrives in no particular order — and a check-in
+  // for a ticket minted by a cash sale in the same batch must find that
+  // ticket already written, or it comes back "unknown" and sits in the queue
+  // until somebody taps Sync again.
+  const rank = (e: Entry) => (e?.type === 'cash' ? 0 : 1);
+  const queue = (Array.isArray(body.queue) ? body.queue.slice(0, 500) : []).sort(
+    (a, b) => rank(a) - rank(b) || String(a?.at ?? '').localeCompare(String(b?.at ?? ''))
+  );
   const db = env.DB;
   const results: Record<string, { ok: boolean; status: string; detail?: string }> = {};
 

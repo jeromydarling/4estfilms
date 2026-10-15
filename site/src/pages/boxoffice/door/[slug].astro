@@ -239,8 +239,13 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     $('[data-pulled]').textContent = `pulled ${new Date(m.pulled_at).toLocaleTimeString()}`;
   }
 
-  async function sync() {
-    const q = await all<Record<string, unknown>>('queue');
+  async function sync(pass = 0) {
+    // The store is keyed by UUID, so getAll() is in no useful order. Send
+    // things in the order they happened; the server also puts sales ahead of
+    // check-ins so a scan can never arrive before the ticket it refers to.
+    const q = (await all<{ id: string; at?: string }>('queue')).sort((a, b) =>
+      String(a.at ?? '').localeCompare(String(b.at ?? ''))
+    );
     if (!q.length || !navigator.onLine) return;
     try {
       const res = await fetch('/api/boxoffice/door/sync', {
@@ -255,12 +260,16 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
       };
       // Only drop what the server actually accepted. Anything marked retry
       // stays in the queue — losing a cash sale is losing money.
+      let accepted = 0;
       for (const [id, r] of Object.entries(body.results)) {
-        if (r.ok) await del('queue', id);
+        if (r.ok) { await del('queue', id); accepted++; }
       }
       $('[data-inside]').textContent = String(body.inside);
       $('[data-sold]').textContent = String(body.sold);
       await paintQueue();
+      // Progress but not done: something that was refused may only have been
+      // waiting on something that just landed. One more go, not a loop.
+      if (accepted && accepted < q.length && pass < 2) await sync(pass + 1);
     } catch {
       /* still offline; the queue keeps */
     }
