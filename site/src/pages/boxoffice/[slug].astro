@@ -177,6 +177,10 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
 
     const state = new Map<string, { qty: number; size: string | null }>();
     let appliedPromo = '';
+    // Two quick taps are two quotes in flight; only the latest may paint.
+    // The server prices the real basket at checkout regardless, so this is
+    // about the number on the button matching the number on the card.
+    let quoteSeq = 0;
 
     const money = (c: number) =>
       (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -207,6 +211,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         return;
       }
 
+      const mine = ++quoteSeq;
       try {
         const res = await fetch('/api/boxoffice/quote', {
           method: 'POST',
@@ -217,6 +222,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
           ok?: boolean; error?: string; subtotal_cents?: number;
           discount_cents?: number; total_cents?: number; admits?: number;
         };
+        if (mine !== quoteSeq) return;
         if (!q.ok) {
           totalBox.hidden = true;
           go.disabled = true;

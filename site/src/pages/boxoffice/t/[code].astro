@@ -30,6 +30,9 @@ if (/^[A-Z0-9]{6,32}$/.test(code) && env.DB) {
     .bind(code)
     .first();
 }
+// The page still renders — a buyer with a typo deserves words, not a blank —
+// but the status says what it is, so nothing caches or indexes a miss.
+if (!t) Astro.response.status = 404;
 ---
 
 <BoxOffice title={t ? `Ticket ${code}` : 'Ticket not found'} bare>
