@@ -1,0 +1,713 @@
+---
+import BoxOffice from '../../../layouts/BoxOffice.astro';
+import { hasSession } from '../../../lib/admin';
+import { getEvent } from '../../../lib/boxoffice-db';
+import { TOUR, showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const event = await getEvent(String(Astro.params.slug ?? ''));
+if (!event) return new Response('Not found', { status: 404 });
+
+const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+---
+
+{/*
+  The door.
+
+  Built to be opened once, on the pavement outside, while the device still has
+  signal — after that it assumes nothing. The manifest, the queue and the
+  catalogue live in IndexedDB; the network is treated as a thing that comes
+  and goes rather than a thing that is there.
+*/}
+<BoxOffice title={`Door — ${event.venue}`} bare wide>
+  <div class="door">
+  <header class="dhead">
+    <div>
+      <p class="eyebrow">Door · {showTime(event.starts_at)}</p>
+      <h1 class="dhead__venue">{event.venue}</h1>
+      <p class="dim">{city}</p>
+    </div>
+    <div class="dhead__right">
+      <span class="pill" data-net>·</span>
+      <span class="pill" data-queue hidden>0 queued</span>
+    </div>
+  </header>
+
+  <div class="counts">
+    <div class="count"><span class="count__n" data-inside>0</span><span class="count__l">In</span></div>
+    <div class="count"><span class="count__n" data-sold>0</span><span class="count__l">Sold</span></div>
+    <div class="count"><span class="count__n">{event.capacity}</span><span class="count__l">House</span></div>
+  </div>
+
+  <nav class="tabs">
+    <button type="button" class="tab tab--on" data-tab="scan">Scan</button>
+    <button type="button" class="tab" data-tab="list">Will-call</button>
+    <button type="button" class="tab" data-tab="sell">Sell</button>
+  </nav>
+
+  <!-- ── scan ── -->
+  <section data-panel="scan">
+    <div class="scanbox">
+      <video data-video playsinline muted hidden></video>
+      <canvas data-canvas hidden></canvas>
+      <div class="scanbox__idle" data-scanidle>
+        <button type="button" class="btn" data-startscan>Start camera</button>
+        <p class="fine">The camera stays on this device. Nothing is uploaded.</p>
+      </div>
+    </div>
+
+    <p class="verdict" data-verdict></p>
+
+    <form class="manual" data-manual>
+      <label class="field">
+        <span>Or type the code</span>
+        <input type="text" name="code" autocapitalize="characters" autocomplete="off"
+               spellcheck="false" placeholder="e.g. 7FKQ2MDH3P" />
+      </label>
+      <button class="btn btn--quiet" type="submit">Check in</button>
+    </form>
+  </section>
+
+  <!-- ── will-call ── -->
+  <section data-panel="list" hidden>
+    <label class="field">
+      <span>Search by name or email</span>
+      <input type="search" data-search placeholder="Surname is usually enough" />
+    </label>
+    <p class="fine" data-listnote>Pull the list while you still have signal.</p>
+    <div class="rows" data-rows></div>
+  </section>
+
+  <!-- ── sell ── -->
+  <section data-panel="sell" hidden>
+    <label class="field">
+      <span>Who is selling</span>
+      <select data-operator>
+        {TOUR.operators.map((o) => <option value={o}>{o}</option>)}
+      </select>
+    </label>
+
+    <div class="picks" data-sellpicks></div>
+
+    <div class="total">
+      <div class="total__row total__row--due"><span>Total</span><span data-selltotal>$0</span></div>
+    </div>
+
+    <label class="field">
+      <span>Name (for will-call)</span>
+      <input type="text" data-sellname placeholder="Optional, but it helps" />
+    </label>
+
+    <button type="button" class="btn" data-sellcash disabled>Take cash</button>
+    <button type="button" class="btn btn--quiet" data-sellcard disabled style="margin-top:.6rem">
+      Take a card
+    </button>
+    <p class="fine">
+      Cash works with no signal and syncs later. A card needs a connection —
+      the buyer finishes on their own phone.
+    </p>
+    <div class="cardbox" data-cardbox hidden>
+      <p class="fine">Have them scan this:</p>
+      <img data-cardqr alt="Checkout QR" width="220" height="220" />
+      <button type="button" class="btn btn--quiet" data-carddone>Done</button>
+    </div>
+    <p class="verdict" data-sellmsg></p>
+  </section>
+
+  <p class="fine sync">
+    <button type="button" class="linkish" data-sync>Sync now</button> ·
+    <button type="button" class="linkish" data-pull>Refresh list</button> ·
+    <span data-pulled>never pulled</span>
+  </p>
+  </div>
+</BoxOffice>
+
+<script>
+  import jsQR from 'jsqr';
+
+  const slug = location.pathname.split('/').filter(Boolean).pop()!;
+  // Non-generic on purpose: inside an Astro <script> the bare name `Element`
+  // resolves to the JSX element type, so a `<T extends Element>` helper
+  // rejects HTMLSelectElement. One cast at the call site is clearer than
+  // fighting that.
+  const $ = (s: string) => document.querySelector(s) as HTMLElement;
+  const $as = <T,>(s: string) => document.querySelector(s) as unknown as T;
+
+  // ── storage ───────────────────────────────────────────────────────────
+  // IndexedDB rather than localStorage: the manifest for a 670-seat house is
+  // comfortably past the 5MB localStorage ceiling once orders are included,
+  // and a door that silently fails to save is worse than no door at all.
+  const DB = 'boxoffice-door';
+  let idb: IDBDatabase | null = null;
+
+  function openDb(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+        if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', { keyPath: 'id' });
+      };
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+  }
+  const tx = (store: string, mode: IDBTransactionMode) =>
+    idb!.transaction(store, mode).objectStore(store);
+  const put = (store: string, v: unknown, key?: IDBValidKey) =>
+    new Promise<void>((res, rej) => {
+      const r = tx(store, 'readwrite').put(v as never, key);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
+  const get = <T,>(store: string, key: IDBValidKey) =>
+    new Promise<T | undefined>((res, rej) => {
+      const r = tx(store, 'readonly').get(key);
+      r.onsuccess = () => res(r.result as T);
+      r.onerror = () => rej(r.error);
+    });
+  const all = <T,>(store: string) =>
+    new Promise<T[]>((res, rej) => {
+      const r = tx(store, 'readonly').getAll();
+      r.onsuccess = () => res(r.result as T[]);
+      r.onerror = () => rej(r.error);
+    });
+  const del = (store: string, key: IDBValidKey) =>
+    new Promise<void>((res, rej) => {
+      const r = tx(store, 'readwrite').delete(key);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
+
+  // ── state ─────────────────────────────────────────────────────────────
+  interface Ticket { code: string; label: string | null; checked_in_at: string | null; void_at: string | null; order_id: number }
+  interface Order { id: number; buyer_name: string | null; buyer_email: string | null; seats: number; channel: string; status: string }
+  interface Item { sku: string; name: string; kind: string; price_cents: number; admits: number; needs_size: boolean }
+  interface Manifest { pulled_at: string; event: { capacity: number; sold: number }; catalogue: Item[]; tickets: Ticket[]; orders: Order[] }
+
+  let manifest: Manifest | null = null;
+  const basket = new Map<string, { qty: number; size: string | null }>();
+
+  const money = (c: number) => (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const uuid = () =>
+    crypto.randomUUID ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  /** Same shape as the server's codes, minted here so an offline stub scans. */
+  const newCode = () => {
+    const b = new Uint8Array(10);
+    crypto.getRandomValues(b);
+    return [...b].map((x) => ALPHABET[x % ALPHABET.length]).join('');
+  };
+
+  // ── network ───────────────────────────────────────────────────────────
+  function paintNet() {
+    const el = $('[data-net]');
+    el.textContent = navigator.onLine ? 'online' : 'offline';
+    el.className = `pill ${navigator.onLine ? 'pill--ok' : 'pill--off'}`;
+  }
+  addEventListener('online', () => { paintNet(); void sync(); });
+  addEventListener('offline', paintNet);
+
+  async function paintQueue() {
+    const q = await all<{ id: string }>('queue');
+    const el = $('[data-queue]');
+    el.hidden = q.length === 0;
+    el.textContent = `${q.length} queued`;
+  }
+
+  function paintCounts() {
+    if (!manifest) return;
+    const live = manifest.tickets.filter((t) => !t.void_at);
+    $('[data-inside]').textContent = String(live.filter((t) => t.checked_in_at).length);
+    $('[data-sold]').textContent = String(live.length);
+  }
+
+  async function pull() {
+    const res = await fetch(`/api/boxoffice/door/manifest?slug=${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error('manifest');
+    const m = (await res.json()) as Manifest & { ok: boolean };
+    manifest = m;
+    await put('kv', m, 'manifest');
+    paintCounts();
+    renderSell();
+    renderRows('');
+    $('[data-pulled]').textContent = `pulled ${new Date(m.pulled_at).toLocaleTimeString()}`;
+  }
+
+  async function sync() {
+    const q = await all<Record<string, unknown>>('queue');
+    if (!q.length || !navigator.onLine) return;
+    try {
+      const res = await fetch('/api/boxoffice/door/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, queue: q }),
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        results: Record<string, { ok: boolean; status: string }>;
+        sold: number; inside: number;
+      };
+      // Only drop what the server actually accepted. Anything marked retry
+      // stays in the queue — losing a cash sale is losing money.
+      for (const [id, r] of Object.entries(body.results)) {
+        if (r.ok) await del('queue', id);
+      }
+      $('[data-inside]').textContent = String(body.inside);
+      $('[data-sold]').textContent = String(body.sold);
+      await paintQueue();
+    } catch {
+      /* still offline; the queue keeps */
+    }
+  }
+
+  // ── check-in ──────────────────────────────────────────────────────────
+  let lastCode = '';
+  let lastAt = 0;
+
+  async function checkIn(code: string) {
+    code = code.trim().toUpperCase();
+    if (!code) return;
+    // The camera fires many frames a second; one scan is one person.
+    if (code === lastCode && Date.now() - lastAt < 3000) return;
+    lastCode = code;
+    lastAt = Date.now();
+
+    const v = $('[data-verdict]');
+    const t = manifest?.tickets.find((x) => x.code === code);
+
+    if (!t) {
+      say(v, 'bad', `${code} — not on this list`);
+      return;
+    }
+    if (t.void_at) {
+      say(v, 'bad', `${code} — refunded, do not admit`);
+      return;
+    }
+    if (t.checked_in_at) {
+      say(v, 'warn', `${code} — already in at ${new Date(t.checked_in_at).toLocaleTimeString()}`);
+      return;
+    }
+
+    const at = new Date().toISOString();
+    t.checked_in_at = at;
+    await put('kv', manifest, 'manifest');
+    await put('queue', {
+      type: 'checkin', id: uuid(), code, at,
+      by: $as<HTMLSelectElement>('[data-operator]')?.value,
+    });
+    paintCounts();
+    await paintQueue();
+    say(v, 'ok', `${t.label ?? 'Admit'} — in`);
+    if (navigator.vibrate) navigator.vibrate(40);
+    void sync();
+  }
+
+  function say(el: Element, kind: 'ok' | 'warn' | 'bad', text: string) {
+    el.textContent = text;
+    (el as HTMLElement).dataset.kind = kind;
+  }
+
+  // ── camera ────────────────────────────────────────────────────────────
+  // BarcodeDetector where it exists (Android Chrome), jsQR everywhere else.
+  // iOS Safari has no BarcodeDetector at all, and half this tour will be run
+  // off an iPhone.
+  let scanning = false;
+  async function startScan() {
+    const video = $as<HTMLVideoElement>('[data-video]');
+    const canvas = $as<HTMLCanvasElement>('[data-canvas]');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      video.srcObject = stream;
+      video.hidden = false;
+      $('[data-scanidle]').hidden = true;
+      await video.play();
+      scanning = true;
+
+      const Detector = (window as unknown as { BarcodeDetector?: new (o: unknown) => { detect(s: unknown): Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+      const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+      const tick = async () => {
+        if (!scanning) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          if (detector) {
+            try {
+              const found = await detector.detect(video);
+              if (found[0]?.rawValue) await checkIn(found[0].rawValue);
+            } catch { /* fall through to the next frame */ }
+          } else {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const r = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+            if (r?.data) await checkIn(r.data);
+          }
+        }
+        requestAnimationFrame(() => void tick());
+      };
+      void tick();
+    } catch {
+      say($('[data-verdict]'), 'bad', 'No camera. Type the code instead.');
+    }
+  }
+
+  // ── will-call ─────────────────────────────────────────────────────────
+  function renderRows(term: string) {
+    const box = $('[data-rows]');
+    if (!manifest) { box.innerHTML = ''; return; }
+    const t = term.trim().toLowerCase();
+    const list = manifest.orders
+      .filter((o) =>
+        !t ||
+        (o.buyer_name ?? '').toLowerCase().includes(t) ||
+        (o.buyer_email ?? '').toLowerCase().includes(t)
+      )
+      .slice(0, 80);
+
+    $('[data-listnote]').textContent =
+      `${manifest.orders.length} orders held. Showing ${list.length}.`;
+
+    box.innerHTML = list
+      .map((o) => {
+        const tickets = manifest!.tickets.filter((x) => x.order_id === o.id && !x.void_at);
+        const inCount = tickets.filter((x) => x.checked_in_at).length;
+        return `<div class="row">
+          <div>
+            <div class="row__name">${esc(o.buyer_name ?? '(no name)')}</div>
+            <div class="row__sub">${esc(o.buyer_email ?? '')} · ${tickets.length} seat${tickets.length === 1 ? '' : 's'}${o.channel !== 'web' ? ' · door' : ''}</div>
+          </div>
+          <button type="button" class="row__go" data-admit="${o.id}"
+            ${inCount >= tickets.length ? 'disabled' : ''}>
+            ${inCount >= tickets.length ? 'all in' : `admit ${tickets.length - inCount}`}
+          </button>
+        </div>`;
+      })
+      .join('');
+  }
+  const esc = (s: string) =>
+    s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+  $('[data-rows]').addEventListener('click', async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-admit]');
+    if (!btn || !manifest) return;
+    const id = Number(btn.dataset.admit);
+    // Admitting a party walks its own tickets, so the count and the scans
+    // can never disagree about who is inside.
+    for (const t of manifest.tickets.filter((x) => x.order_id === id && !x.void_at && !x.checked_in_at)) {
+      lastCode = '';
+      await checkIn(t.code);
+    }
+    renderRows($as<HTMLInputElement>('[data-search]').value);
+  });
+
+  $('[data-search]').addEventListener('input', (e) =>
+    renderRows((e.target as HTMLInputElement).value)
+  );
+
+  // ── sell ──────────────────────────────────────────────────────────────
+  const SIZES = ['S', 'M', 'L', 'XL', '2XL'];
+
+  function renderSell() {
+    const box = $('[data-sellpicks]');
+    if (!manifest) return;
+    box.innerHTML = manifest.catalogue
+      .map(
+        (p) => `<div class="pick" data-sku="${p.sku}">
+          <span class="pick__head">
+            <span class="pick__name">${esc(p.name)}</span>
+            <span class="pick__price">${money(p.price_cents)}</span>
+          </span>
+          <span class="pick__qty">
+            <button type="button" class="step" data-step="-1">−</button>
+            <output data-qty>0</output>
+            <button type="button" class="step" data-step="1">+</button>
+          </span>
+          ${p.needs_size ? `<span class="sizes">${SIZES.map((s) => `<button type="button" class="size" data-sizepick="${s}">${s}</button>`).join('')}</span>` : ''}
+        </div>`
+      )
+      .join('');
+  }
+
+  function sellTotal() {
+    if (!manifest) return 0;
+    let t = 0;
+    for (const [sku, v] of basket) {
+      const p = manifest.catalogue.find((x) => x.sku === sku);
+      if (p) t += p.price_cents * v.qty;
+    }
+    return t;
+  }
+
+  function paintSell() {
+    const total = sellTotal();
+    $('[data-selltotal]').textContent = money(total);
+    const incomplete = [...basket.entries()].some(([sku, v]) => {
+      const p = manifest?.catalogue.find((x) => x.sku === sku);
+      return v.qty > 0 && p?.needs_size && !v.size;
+    });
+    const ready = total > 0 && !incomplete;
+    $as<HTMLButtonElement>('[data-sellcash]').disabled = !ready;
+    $as<HTMLButtonElement>('[data-sellcard]').disabled = !ready || !navigator.onLine;
+    $as<HTMLButtonElement>('[data-sellcash]').textContent =
+      ready ? `Take ${money(total)} cash` : 'Take cash';
+  }
+
+  $('[data-sellpicks]').addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.pick');
+    if (!el) return;
+    const sku = el.dataset.sku!;
+    const cur = basket.get(sku) ?? { qty: 0, size: null };
+
+    const step = (e.target as HTMLElement).closest<HTMLElement>('[data-step]');
+    if (step) {
+      cur.qty = Math.max(0, Math.min(50, cur.qty + Number(step.dataset.step)));
+      el.querySelector('[data-qty]')!.textContent = String(cur.qty);
+      el.classList.toggle('pick--on', cur.qty > 0);
+      if (cur.qty === 0) cur.size = null;
+    }
+    const size = (e.target as HTMLElement).closest<HTMLElement>('[data-sizepick]');
+    if (size) {
+      cur.size = size.dataset.sizepick!;
+      el.querySelectorAll('.size').forEach((b) => b.classList.toggle('size--on', b === size));
+    }
+    basket.set(sku, cur);
+    paintSell();
+  });
+
+  const basketLines = () =>
+    [...basket.entries()].filter(([, v]) => v.qty > 0).map(([sku, v]) => ({ sku, qty: v.qty, size: v.size }));
+
+  $('[data-sellcash]').addEventListener('click', async () => {
+    if (!manifest) return;
+    const lines = basketLines();
+    const admits = lines.reduce((n, l) => {
+      const p = manifest!.catalogue.find((x) => x.sku === l.sku);
+      return n + (p?.admits ?? 0) * l.qty;
+    }, 0);
+
+    // Codes are minted here so the stub handed over at the window is the same
+    // code the server will store when the queue drains.
+    const codes = Array.from({ length: admits }, newCode);
+    const name = $as<HTMLInputElement>('[data-sellname]').value.trim();
+    const id = uuid();
+
+    await put('queue', {
+      type: 'cash', id, basket: lines, codes,
+      buyer_name: name || null,
+      at: new Date().toISOString(),
+      by: $as<HTMLSelectElement>('[data-operator]').value,
+    });
+
+    // Reflected locally at once so the counts and will-call are right even if
+    // the sync does not happen until the drive home.
+    const orderId = -Date.now();
+    manifest.orders.unshift({
+      id: orderId, buyer_name: name || '(cash)', buyer_email: null,
+      seats: admits, channel: 'door_cash', status: 'paid',
+    });
+    for (const code of codes) {
+      manifest.tickets.push({ code, label: name || null, checked_in_at: null, void_at: null, order_id: orderId });
+    }
+    await put('kv', manifest, 'manifest');
+
+    basket.clear();
+    renderSell();
+    paintSell();
+    paintCounts();
+    await paintQueue();
+    $as<HTMLInputElement>('[data-sellname]').value = '';
+    say($('[data-sellmsg]'), 'ok',
+      `Cash taken. ${admits} seat${admits === 1 ? '' : 's'} — codes ${codes.join(', ') || 'n/a'}`);
+    void sync();
+  });
+
+  $('[data-sellcard]').addEventListener('click', async () => {
+    const msg = $('[data-sellmsg]');
+    say(msg, 'warn', 'Opening checkout…');
+    try {
+      const res = await fetch('/api/boxoffice/door/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          slug, basket: basketLines(),
+          operator: $as<HTMLSelectElement>('[data-operator]').value,
+        }),
+      });
+      const b = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      if (!b.ok || !b.url) { say(msg, 'bad', b.error ?? 'Card sale failed. Take cash?'); return; }
+      // A QR the buyer scans with their own phone — no terminal to carry.
+      $as<HTMLImageElement>('[data-cardqr]').src =
+        `/boxoffice/qr/link.svg?u=${encodeURIComponent(b.url)}`;
+      $('[data-cardbox]').hidden = false;
+      say(msg, 'ok', 'Have them scan and pay. It lands in the list when they do.');
+    } catch {
+      say(msg, 'bad', 'No connection. Take cash instead.');
+    }
+  });
+
+  $('[data-carddone]').addEventListener('click', async () => {
+    $('[data-cardbox]').hidden = true;
+    basket.clear();
+    renderSell();
+    paintSell();
+    if (navigator.onLine) await pull();
+  });
+
+  // ── wiring ────────────────────────────────────────────────────────────
+  for (const b of document.querySelectorAll<HTMLElement>('[data-tab]')) {
+    b.addEventListener('click', () => {
+      for (const x of document.querySelectorAll('[data-tab]')) x.classList.toggle('tab--on', x === b);
+      for (const p of document.querySelectorAll<HTMLElement>('[data-panel]')) {
+        p.hidden = p.dataset.panel !== b.dataset.tab;
+      }
+    });
+  }
+  $('[data-startscan]').addEventListener('click', () => void startScan());
+  $('[data-manual]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $as<HTMLFormElement>('[data-manual]').querySelector('input')!;
+    lastCode = '';
+    await checkIn(input.value);
+    input.value = '';
+  });
+  $('[data-sync]').addEventListener('click', () => void sync());
+  $('[data-pull]').addEventListener('click', () => void pull());
+
+  (async () => {
+    idb = await openDb();
+    paintNet();
+    await paintQueue();
+    const cached = await get<Manifest>('kv', 'manifest');
+    if (cached) {
+      manifest = cached;
+      paintCounts();
+      renderSell();
+      renderRows('');
+      $('[data-pulled]').textContent = `cached ${new Date(cached.pulled_at).toLocaleTimeString()}`;
+    }
+    if (navigator.onLine) {
+      try { await pull(); } catch { /* the cache stands */ }
+      await sync();
+    }
+    paintSell();
+  })();
+</script>
+
+<style>
+  .dhead {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1rem; border-bottom: 1px solid var(--rule); padding-bottom: .8rem;
+  }
+  .dhead__venue { font-size: 1.5rem; margin: 0; }
+  .dhead__right { display: flex; flex-direction: column; gap: .35rem; align-items: flex-end; }
+  .pill {
+    font-family: var(--mono); font-size: .58rem; letter-spacing: .14em;
+    text-transform: uppercase; border: 1px solid var(--rule);
+    border-radius: 999px; padding: .25rem .6rem; color: var(--warm); white-space: nowrap;
+  }
+  .pill--ok { color: var(--ok); border-color: #3f5c38; }
+  .pill--off { color: #e0b36a; border-color: #8a6a28; }
+
+  .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 1rem 0; }
+  .count {
+    border: 1px solid var(--rule); border-radius: 4px; padding: .7rem;
+    text-align: center; background: var(--ground-2);
+  }
+  .count__n { display: block; font-family: var(--display); font-size: 1.8rem; line-height: 1; }
+  .count__l {
+    font-family: var(--mono); font-size: .56rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--warm);
+  }
+
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-bottom: 1.2rem; }
+  .tab {
+    background: var(--ground-2); border: 1px solid var(--rule); color: var(--parchment-dim);
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: .9rem .4rem; border-radius: 3px; cursor: pointer; min-height: 3rem;
+  }
+  .tab--on { border-color: var(--brass); color: var(--brass-lift); background: var(--ground-3); }
+
+  .scanbox {
+    position: relative; border: 1px solid var(--rule); border-radius: 4px;
+    background: #000; overflow: hidden; aspect-ratio: 4 / 3; display: grid;
+    place-items: center;
+  }
+  .scanbox video { width: 100%; height: 100%; object-fit: cover; }
+  .scanbox__idle { text-align: center; padding: 1.2rem; }
+
+  .verdict {
+    font-family: var(--mono); font-size: .9rem; min-height: 2.6rem;
+    margin: .9rem 0; padding: .7rem .8rem; border-radius: 3px;
+    border: 1px solid var(--rule); color: var(--parchment-dim);
+  }
+  .verdict[data-kind='ok'] { color: #bfe0b4; border-color: #3f5c38; background: #16210f; }
+  .verdict[data-kind='warn'] { color: #e8c98a; border-color: #8a6a28; background: #241c0c; }
+  .verdict[data-kind='bad'] { color: #efb4b4; border-color: #7a2630; background: #260f12; }
+
+  .total { margin: 1.2rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: .7rem 0; }
+  .total__row { display: flex; justify-content: space-between; }
+  .total__row--due { font-family: var(--display); font-size: 1.3rem; }
+
+  .cardbox { text-align: center; margin-top: 1rem; }
+  .cardbox img { background: #fff; padding: 10px; border-radius: 6px; margin: .5rem auto; display: block; }
+
+  .sync { margin-top: 2rem; text-align: center; }
+  .linkish {
+    background: none; border: 0; color: var(--brass-lift); cursor: pointer;
+    font: inherit; text-decoration: underline; padding: .4rem;
+  }
+</style>
+
+<!--
+  The sell list and the will-call rows are built by script, so they never
+  carry Astro's scoping attribute and scoped rules simply do not reach them.
+  These live in a global block namespaced under .door instead.
+-->
+<style is:global>
+  .door .picks { display: grid; gap: .6rem; }
+  .door .pick {
+    border: 1px solid var(--rule); border-radius: 4px; padding: .8rem;
+    background: var(--ground-2); display: grid; gap: .35rem;
+  }
+  .door .pick--on { border-color: var(--brass); background: var(--ground-3); }
+  .door .pick__head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+  .door .pick__name { font-family: var(--display); font-size: 1.05rem; }
+  .door .pick__price { font-family: var(--mono); color: var(--brass-lift); }
+  .door .pick__qty { display: flex; align-items: center; gap: .5rem; }
+  .door .step {
+    width: 3rem; height: 3rem; border-radius: 3px; background: var(--ground);
+    border: 1px solid var(--rule); color: var(--parchment); font-size: 1.4rem; cursor: pointer;
+  }
+  .door [data-qty] { min-width: 2.5rem; text-align: center; font-family: var(--mono); font-size: 1.1rem; }
+  .door .sizes { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .2rem; }
+  .door .size {
+    min-width: 3rem; height: 2.9rem; border-radius: 3px; background: var(--ground);
+    border: 1px solid var(--rule); color: var(--parchment); font-family: var(--mono);
+    font-size: .8rem; cursor: pointer;
+  }
+  .door .size--on { border-color: var(--brass); color: var(--brass-lift); }
+
+  .door .rows { display: grid; gap: .4rem; }
+  .door .row {
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    border: 1px solid var(--rule); border-radius: 4px; padding: .7rem .8rem;
+    background: var(--ground-2);
+  }
+  .door .row__name { font-family: var(--display); font-size: 1.05rem; }
+  .door .row__sub { font-size: .82rem; color: var(--warm); }
+  .door .row__go {
+    background: var(--ground); border: 1px solid var(--brass); color: var(--brass-lift);
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+    padding: .7rem .9rem; border-radius: 3px; cursor: pointer; min-height: 2.8rem; white-space: nowrap;
+  }
+  .door .row__go:disabled { border-color: var(--rule); color: var(--warm); cursor: default; }
+</style>

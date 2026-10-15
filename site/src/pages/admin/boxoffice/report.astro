@@ -1,0 +1,213 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { hasSession } from '../../../lib/admin';
+import { getEvent } from '../../../lib/boxoffice-db';
+import { salesByCode, soldBySku, stopTotals } from '../../../lib/boxoffice-report';
+import { TOUR, money, showTime } from '../../../lib/boxoffice';
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const slug = Astro.url.searchParams.get('slug') ?? '';
+const event = await getEvent(slug);
+if (!event) return Astro.redirect('/admin/boxoffice/');
+
+const [totals] = await stopTotals(event.id);
+const [items, codes, orders] = await Promise.all([
+  soldBySku(event.id),
+  salesByCode(event.id),
+  env.DB
+    .prepare(
+      `SELECT o.id, o.buyer_name, o.buyer_email, o.channel, o.status, o.total_cents,
+              o.fee_cents, o.refunded_cents, o.promo_code, o.operator, o.created_at,
+              (SELECT COUNT(*) FROM bo_tickets t WHERE t.order_id = o.id AND t.void_at IS NULL) AS seats
+         FROM bo_orders o WHERE o.event_id = ?1 ORDER BY o.created_at DESC LIMIT 200`
+    )
+    .bind(event.id)
+    .all<Record<string, unknown>>(),
+]);
+
+const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+// Merch units are counted separately from seats: a family package is one
+// bucket and one poster, and the table should say so rather than implying
+// four of everything.
+const merch = items.filter((i) => i.admits === 0);
+---
+
+<Admin title={`Report — ${event.venue}`}>
+  <h1>{event.venue}</h1>
+  <p class="sub">{city} · {showTime(event.starts_at)}</p>
+
+  <p class="acts">
+    <a class="lnk" href="/admin/boxoffice/">← All stops</a>
+    <a class="lnk" href={`/admin/boxoffice/event/?slug=${event.slug}`}>Edit stop</a>
+    <a class="lnk" href={`/api/admin/boxoffice/export?what=stop&slug=${event.slug}`}>Stop CSV</a>
+    <a class="lnk" href={`/api/admin/boxoffice/export?what=orders&slug=${event.slug}`}>Orders CSV</a>
+  </p>
+
+  <h2>The money</h2>
+  <div class="scroll">
+    <table class="money">
+      <tbody>
+        <tr><td>Gross takings</td><td class="right num">{money(totals.gross_cents)}</td></tr>
+        <tr><td>Less refunds</td><td class="right num">−{money(totals.refunded_cents)}</td></tr>
+        <tr><td>Less Stripe fees <span class="muted">(as charged, not estimated)</span></td>
+            <td class="right num">−{money(totals.fees_cents)}</td></tr>
+        <tr><td>Less the house <span class="muted">(rental for this stop)</span></td>
+            <td class="right num">−{money(totals.rental_cents)}</td></tr>
+        <tr class="rule"><td><strong>Net</strong></td>
+            <td class={`right num ${totals.net_cents < 0 ? 'bad' : ''}`}>
+              <strong>{money(totals.net_cents)}</strong></td></tr>
+        <tr><td>Tithe at {TOUR.tithePercent}% of net
+              {totals.net_cents <= 0 && <span class="muted"> — nil, the stop did not clear</span>}</td>
+            <td class="right num">{money(totals.tithe_cents)}</td></tr>
+        <tr><td><strong>Retained by the tour</strong></td>
+            <td class="right num"><strong>{money(totals.retained_cents)}</strong></td></tr>
+        <tr class="rule"><td>Free-will offering <span class="muted">(counted by hand; passed on whole)</span></td>
+            <td class="right num">{money(totals.offering_cents)}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <form class="offering" method="post" action="/api/admin/boxoffice/event">
+    <input type="hidden" name="action" value="offering" />
+    <input type="hidden" name="slug" value={event.slug} />
+    <label>
+      <span class="label">Offering counted after the show</span>
+      <input name="offering" type="text" inputmode="decimal"
+             value={(totals.offering_cents / 100).toFixed(2)} />
+    </label>
+    <button type="submit">Save</button>
+  </form>
+
+  <h2>Who came</h2>
+  <div class="scroll">
+    <table>
+      <tbody>
+        <tr><td>Seats sold</td><td class="right num">{totals.attendees} of {totals.capacity}</td></tr>
+        <tr><td>Checked in at the door</td><td class="right num">{totals.checked_in}</td></tr>
+        <tr><td>No-shows</td><td class="right num">{totals.attendees - totals.checked_in}</td></tr>
+        <tr><td>Orders <span class="muted">({totals.door_orders} taken at the door)</span></td>
+            <td class="right num">{totals.orders}</td></tr>
+        <tr><td>Cash taken at the window</td><td class="right num">{money(totals.cash_cents)}</td></tr>
+        <tr><td>Revenue per attendee</td>
+            <td class="right num">{money(totals.revenue_per_attendee_cents)}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Sold by type</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Item</th><th class="right">Units</th><th class="right">Seats</th><th class="right">Gross</th></tr></thead>
+      <tbody>
+        {items.length ? items.map((i) => (
+          <tr>
+            <td>{i.name}</td>
+            <td class="right num">{i.units}</td>
+            <td class="right num">{i.admits || '—'}</td>
+            <td class="right num">{money(i.gross_cents)}</td>
+          </tr>
+        )) : <tr><td colspan="4" class="empty">Nothing sold yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Merchandise units</h2>
+  <p class="muted small">
+    Counted from what was bought, including the items inside packages.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Item</th><th class="right">Units</th><th class="right">Gross</th></tr></thead>
+      <tbody>
+        {merch.length ? merch.map((i) => (
+          <tr><td>{i.name}</td><td class="right num">{i.units}</td><td class="right num">{money(i.gross_cents)}</td></tr>
+        )) : <tr><td colspan="3" class="empty">No standalone merch sold.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>By partner code</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Code</th><th>Partner</th><th class="right">Orders</th><th class="right">Seats</th><th class="right">Gross</th></tr></thead>
+      <tbody>
+        {codes.filter((c) => c.orders > 0).length
+          ? codes.filter((c) => c.orders > 0).map((c) => (
+              <tr>
+                <td class="num">{c.code}</td>
+                <td>{c.partner}</td>
+                <td class="right num">{c.orders}</td>
+                <td class="right num">{c.seats}</td>
+                <td class="right num">{money(c.gross_cents)}</td>
+              </tr>
+            ))
+          : <tr><td colspan="5" class="empty">No code has been used at this stop.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Orders</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>When</th><th>Buyer</th><th>How</th><th class="right">Seats</th>
+            <th class="right">Paid</th><th class="right">Fee</th><th>Code</th><th></th></tr>
+      </thead>
+      <tbody>
+        {(orders.results ?? []).length ? (orders.results ?? []).map((o) => (
+          <tr class={o.status === 'refunded' ? 'off' : ''}>
+            <td class="num">{String(o.created_at ?? '').slice(0, 16).replace('T', ' ')}</td>
+            <td>{String(o.buyer_name ?? '—')}<br /><span class="muted">{String(o.buyer_email ?? '')}</span></td>
+            <td>{String(o.channel).replace('door_', 'door ')}{o.operator ? ` · ${o.operator}` : ''}</td>
+            <td class="right num">{String(o.seats)}</td>
+            <td class="right num">{money(Number(o.total_cents))}</td>
+            <td class="right num">{money(Number(o.fee_cents))}</td>
+            <td class="num">{String(o.promo_code ?? '')}</td>
+            <td class="right">
+              {o.status === 'refunded'
+                ? <span class="muted">refunded</span>
+                : (
+                  <form method="post" action="/api/admin/boxoffice/refund"
+                        onsubmit="return confirm('Refund this order and void its tickets? This cannot be undone.')">
+                    <input type="hidden" name="order_id" value={String(o.id)} />
+                    <input type="hidden" name="slug" value={event.slug} />
+                    <button class="refund" type="submit">Refund</button>
+                  </form>
+                )}
+            </td>
+          </tr>
+        )) : <tr><td colspan="8" class="empty">No orders yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+</Admin>
+
+<style>
+  .acts { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0 0 1.5rem; }
+  .lnk { color: var(--dim); font-size: .85rem; }
+  .money td { padding: .55rem .8rem; }
+  .money .rule td { border-top: 2px solid var(--rule); }
+  .muted { color: var(--faint); }
+  .small { font-size: .82rem; margin-top: -.4rem; }
+  .bad { color: #e08a8a; }
+  .off { opacity: .5; }
+  .refund {
+    background: none; border: 1px solid var(--rule); color: var(--dim);
+    font: inherit; font-size: .76rem; padding: .3rem .6rem; border-radius: 3px; cursor: pointer;
+  }
+  .refund:hover { color: #e08a8a; border-color: #7a2630; }
+  .offering { display: flex; gap: .7rem; align-items: flex-end; margin: 1rem 0 0; }
+  .offering label { display: block; }
+  .offering input {
+    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 3px;
+    color: var(--bone); font: inherit; padding: .5rem .7rem; width: 10rem;
+  }
+  .offering button {
+    background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+    font: inherit; font-weight: 600; padding: .55rem 1rem; cursor: pointer;
+  }
+</style>

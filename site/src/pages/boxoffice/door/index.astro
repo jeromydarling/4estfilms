@@ -1,0 +1,53 @@
+---
+import BoxOffice from '../../../layouts/BoxOffice.astro';
+import { hasSession } from '../../../lib/admin';
+import { listEvents, soldAdmits } from '../../../lib/boxoffice-db';
+import { showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const events = await listEvents();
+const rows = await Promise.all(
+  events.map(async (e) => ({ e, sold: await soldAdmits(e.id) }))
+);
+---
+
+<BoxOffice title="Door — pick a stop" bare>
+  <p class="eyebrow">Door mode</p>
+  <h1>Which house?</h1>
+  <p class="dim">
+    Open the stop while you still have signal. It caches everything it needs
+    and keeps working when the signal goes.
+  </p>
+
+  <ul class="stops">
+    {rows.map(({ e, sold }) => (
+      <li>
+        <a href={`/boxoffice/door/${e.slug}/`}>
+          <span class="when">{showTime(e.starts_at)}</span>
+          <span class="venue">{e.venue}</span>
+          <span class="dim">{e.city}{e.region ? `, ${e.region}` : ''} · {sold}/{e.capacity} sold</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  <p class="fine" style="margin-top:2rem"><a href="/admin/boxoffice/">Box office admin</a></p>
+</BoxOffice>
+
+<style>
+  .stops { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .5rem; }
+  .stops a {
+    display: grid; gap: .15rem; padding: 1rem;
+    border: 1px solid var(--rule); border-radius: 4px; background: var(--ground-2);
+    text-decoration: none; color: var(--parchment); min-height: 4.5rem;
+  }
+  .stops a:hover { border-color: var(--brass); }
+  .when {
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--brass);
+  }
+  .venue { font-family: var(--display); font-size: 1.15rem; }
+</style>

@@ -1,0 +1,109 @@
+---
+import BoxOffice from '../../layouts/BoxOffice.astro';
+import { listEvents, soldAdmits } from '../../lib/boxoffice-db';
+import { TOUR, showTime } from '../../lib/boxoffice';
+
+export const prerender = false;
+
+const events = await listEvents(['on_sale', 'closed']);
+const rows = await Promise.all(
+  events.map(async (e) => {
+    const sold = await soldAdmits(e.id);
+    const left = e.capacity - sold;
+    const soldOut = left <= 0;
+    // Worked out here rather than in the markup: a `<=` inside a JSX
+    // expression is parsed as the start of an element.
+    const tag =
+      e.status !== 'on_sale'
+        ? { label: 'Not on sale', cls: 'tag' }
+        : soldOut
+          ? { label: 'Sold out', cls: 'tag tag--out' }
+          : left <= 20
+            ? { label: `${left} left`, cls: 'tag tag--few' }
+            : { label: 'Tickets', cls: 'tag tag--go' };
+    return { e, sold, left, soldOut, tag };
+  })
+);
+
+const legs = [...new Set(rows.map((r) => r.e.leg ?? 'The tour'))];
+---
+
+<BoxOffice
+  title={`${TOUR.film} — the ${TOUR.year} tour`}
+  description={`Tickets for the ${TOUR.year} theatrical tour of ${TOUR.film}. Forty-eight stops, self-distributed, one town at a time.`}
+>
+  <p class="eyebrow">A {TOUR.year} theatrical tour</p>
+  <h1>{TOUR.film}</h1>
+  <p class="dim lede">
+    We are taking this film to forty-eight towns ourselves — renting the houses,
+    running our own door, and bringing it to the people who asked for it.
+  </p>
+
+  {legs.map((leg) => (
+    <section>
+      <h2>{leg}</h2>
+      <ul class="stops">
+        {rows
+          .filter((r) => (r.e.leg ?? 'The tour') === leg)
+          .map(({ e, tag }) => (
+            <li class="stop">
+              <a href={`/boxoffice/${e.slug}/`} class="stop__link">
+                <span class="stop__when">{showTime(e.starts_at)}</span>
+                <span class="stop__where">
+                  {e.city}{e.region ? `, ${e.region}` : ''}
+                </span>
+                <span class="stop__venue dim">{e.venue}</span>
+                <span class="stop__state">
+                  <em class={tag.cls}>{tag.label}</em>
+                </span>
+              </a>
+            </li>
+          ))}
+      </ul>
+    </section>
+  ))}
+
+  {!rows.length && (
+    <p class="note">Stops go on sale shortly. Nothing is listed yet.</p>
+  )}
+
+  <p class="fine">
+    Bringing it to your town is a thing you can ask for —
+    <a href="/screenings/">tell us where you are</a>.
+  </p>
+</BoxOffice>
+
+<style>
+  .lede { font-size: 1.08rem; margin: 0 0 1rem; }
+  .stops { list-style: none; margin: 0; padding: 0; }
+  .stop { border-top: 1px solid var(--rule); }
+  .stop:last-child { border-bottom: 1px solid var(--rule); }
+  .stop__link {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .15rem 1rem;
+    padding: 1rem .2rem;
+    text-decoration: none;
+    color: var(--parchment);
+    align-items: center;
+    min-height: 4.4rem;
+  }
+  .stop__link:hover { background: var(--ground-2); }
+  .stop__when {
+    grid-column: 1; font-family: var(--mono); font-size: .64rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--brass);
+  }
+  .stop__where { grid-column: 1; font-family: var(--display); font-size: 1.15rem; }
+  .stop__venue { grid-column: 1; font-size: .9rem; }
+  .stop__state { grid-column: 2; grid-row: 1 / span 3; }
+  .tag {
+    font-family: var(--mono); font-style: normal; font-size: .6rem;
+    letter-spacing: .14em; text-transform: uppercase;
+    border: 1px solid var(--rule); border-radius: 999px;
+    padding: .3rem .7rem; white-space: nowrap; color: var(--parchment-dim);
+  }
+  .tag--go { color: var(--brass-lift); border-color: var(--brass); }
+  .tag--few { color: #e0b36a; border-color: #8a6a28; }
+  .tag--out { color: var(--warm); }
+  .fine { margin-top: 2.5rem; }
+</style>

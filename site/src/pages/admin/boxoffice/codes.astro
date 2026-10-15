@@ -1,0 +1,106 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { hasSession } from '../../../lib/admin';
+import { listEvents } from '../../../lib/boxoffice-db';
+import { salesByCode } from '../../../lib/boxoffice-report';
+import { money } from '../../../lib/boxoffice';
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const [codes, events, rows] = await Promise.all([
+  salesByCode(),
+  listEvents(),
+  env.DB.prepare(`SELECT * FROM bo_promo_codes ORDER BY code`).all<Record<string, unknown>>(),
+]);
+const sales = new Map(codes.map((c) => [c.code, c]));
+const bySlug = new Map(events.map((e) => [e.id, e]));
+---
+
+<Admin title="Promo codes">
+  <h1>Partner codes</h1>
+  <p class="sub">
+    One per parish or organisation. The code is how we know who filled the room —
+    a discount is optional and usually nil.
+  </p>
+
+  <form method="post" action="/api/admin/boxoffice/codes" class="new">
+    <div class="grid">
+      <label><span class="label">Code</span><input name="code" required placeholder="STMARYS" /></label>
+      <label><span class="label">Partner</span><input name="partner" required placeholder="St Mary's, Yankton" /></label>
+      <label><span class="label">Stop</span>
+        <select name="event_slug">
+          <option value="">Any stop</option>
+          {events.map((e) => <option value={e.slug}>{e.venue} — {e.city}</option>)}
+        </select></label>
+      <label><span class="label">Discount</span>
+        <select name="kind">
+          <option value="none">None (attribution only)</option>
+          <option value="percent">Percent off</option>
+          <option value="fixed">Dollars off</option>
+        </select></label>
+      <label><span class="label">Amount</span><input name="value" placeholder="10" /></label>
+      <label><span class="label">Max uses</span><input name="max_uses" placeholder="unlimited" /></label>
+    </div>
+    <button type="submit">Issue code</button>
+  </form>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Partner</th><th>Stop</th><th>Discount</th>
+            <th class="right">Used</th><th class="right">Orders</th>
+            <th class="right">Seats</th><th class="right">Gross</th><th></th></tr>
+      </thead>
+      <tbody>
+        {(rows.results ?? []).map((c) => {
+          const s = sales.get(String(c.code));
+          const ev = c.event_id ? bySlug.get(Number(c.event_id)) : null;
+          return (
+            <tr class={c.active ? '' : 'off'}>
+              <td class="num">{String(c.code)}</td>
+              <td>{String(c.partner)}</td>
+              <td>{ev ? `${ev.city}` : 'any'}</td>
+              <td>{c.kind === 'percent' ? `${c.value}%`
+                  : c.kind === 'fixed' ? money(Number(c.value)) : '—'}</td>
+              <td class="right num">{String(c.uses)}{c.max_uses ? ` / ${c.max_uses}` : ''}</td>
+              <td class="right num">{s?.orders ?? 0}</td>
+              <td class="right num">{s?.seats ?? 0}</td>
+              <td class="right num">{money(s?.gross_cents ?? 0)}</td>
+              <td class="right">
+                <form method="post" action="/api/admin/boxoffice/codes">
+                  <input type="hidden" name="action" value="toggle" />
+                  <input type="hidden" name="id" value={String(c.id)} />
+                  <button class="toggle" type="submit">{c.active ? 'disable' : 'enable'}</button>
+                </form>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+  <p class="acts"><a class="lnk" href="/admin/boxoffice/">← Box office</a></p>
+</Admin>
+
+<style>
+  .new { border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.1rem; margin-bottom: 1.5rem; }
+  .grid { display: grid; gap: 0 1rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  label { display: block; margin-bottom: .9rem; }
+  .label { display: block; margin-bottom: .3rem; }
+  input, select {
+    width: 100%; background: var(--ink-2); border: 1px solid var(--rule);
+    border-radius: 3px; color: var(--bone); font: inherit; padding: .5rem .65rem;
+  }
+  button {
+    background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+    font: inherit; font-weight: 600; padding: .55rem 1.1rem; cursor: pointer;
+  }
+  .toggle { background: none; border: 1px solid var(--rule); color: var(--dim);
+            font-size: .76rem; padding: .25rem .55rem; font-weight: 400; }
+  .off { opacity: .45; }
+  .acts { margin-top: 1.5rem; }
+  .lnk { color: var(--dim); font-size: .85rem; }
+</style>

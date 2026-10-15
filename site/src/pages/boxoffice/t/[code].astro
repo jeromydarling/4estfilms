@@ -1,0 +1,83 @@
+---
+import BoxOffice from '../../../layouts/BoxOffice.astro';
+import { env } from 'cloudflare:workers';
+import { showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * One ticket, big enough to scan off a cracked screen in a dark lobby.
+ *
+ * Linked from the email so a buyer can open a single seat without hunting
+ * through an inbox. Holding the code is the proof — the same thing the QR
+ * encodes — so there is nothing extra to authenticate here.
+ */
+const code = String(Astro.params.code ?? '').toUpperCase();
+let t: {
+  code: string; label: string | null; seq: number; checked_in_at: string | null;
+  void_at: string | null; venue: string; city: string; region: string | null;
+  starts_at: string; doors_at: string | null; title: string;
+} | null = null;
+
+if (/^[A-Z0-9]{6,32}$/.test(code) && env.DB) {
+  t = await env.DB
+    .prepare(
+      `SELECT k.code, k.label, k.seq, k.checked_in_at, k.void_at,
+              e.venue, e.city, e.region, e.starts_at, e.doors_at, e.title
+         FROM bo_tickets k JOIN bo_events e ON e.id = k.event_id
+        WHERE k.code = ?1`
+    )
+    .bind(code)
+    .first();
+}
+---
+
+<BoxOffice title={t ? `Ticket ${code}` : 'Ticket not found'} bare>
+  {t ? (
+    <div class="ticket">
+      <p class="eyebrow">Admit one</p>
+      <h1>{t.venue}</h1>
+      <p class="dim">{t.city}{t.region ? `, ${t.region}` : ''}</p>
+      <p class="when">{showTime(t.starts_at)}</p>
+      {t.doors_at && <p class="fine">Doors {showTime(t.doors_at)}</p>}
+
+      <img class="qr" src={`/boxoffice/qr/${t.code}.svg`} alt={`QR code ${t.code}`}
+           width="248" height="248" />
+      <p class="code">{t.code}</p>
+      {t.label && <p class="fine">{t.label}</p>}
+
+      {t.void_at && (
+        <p class="note note--bad">This ticket was refunded and will not be admitted.</p>
+      )}
+      {t.checked_in_at && !t.void_at && (
+        <p class="note note--good">Checked in {t.checked_in_at.slice(0, 16).replace('T', ' ')}.</p>
+      )}
+      <p class="fine">{t.title}</p>
+    </div>
+  ) : (
+    <div class="ticket">
+      <h1>We can’t find that ticket.</h1>
+      <p class="dim">
+        Check the code, or write to
+        <a href="mailto:hello@4estfilms.studio">hello@4estfilms.studio</a>. At
+        the door we can also find you by name.
+      </p>
+    </div>
+  )}
+</BoxOffice>
+
+<style>
+  .ticket { text-align: center; padding-top: 1rem; }
+  .when { font-family: var(--mono); font-size: .8rem; letter-spacing: .14em;
+          text-transform: uppercase; color: var(--brass); margin: .8rem 0 0; }
+  /* White plate behind the QR: scanners want contrast, and a dark-on-dark
+     code at low brightness is the thing that holds up a queue. */
+  .qr {
+    display: block; margin: 1.5rem auto .8rem; width: min(248px, 70vw);
+    height: auto; background: #fff; padding: 10px; border-radius: 6px;
+  }
+  .code {
+    font-family: var(--mono); font-size: 1.4rem; letter-spacing: .22em;
+    margin: 0; color: var(--parchment);
+  }
+</style>

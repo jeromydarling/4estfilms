@@ -4,6 +4,7 @@ import { verifySignature, type CheckoutSession } from '../../../lib/stripe';
 import { newTicketToken, premiere, dollars } from '../../../lib/premiere';
 import { known } from '../../../lib/known';
 import { layout, send, SITE } from '../../../lib/email';
+import { onBoxOffice } from '../../../lib/boxoffice-webhook';
 
 export const prerender = false;
 
@@ -55,6 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     if (kind === 'donation') return await onDonation(db, s, country);
     if (kind === 'premiere') return await onTicket(db, s, country);
+    if (kind === 'boxoffice') return await onBoxOffice(s);
 
     console.warn('stripe session with no recognised kind', { session: s.id });
     return new Response('ignored', { status: 200 });
