@@ -63,4 +63,6 @@ export interface CheckoutSession {
   customer_details?: { email?: string; name?: string };
   customer_email?: string;
   metadata?: Record<string, string>;
+  /** Checkout's own custom fields — this is where the will-call name lands. */
+  custom_fields?: { key?: string; text?: { value?: string } }[];
 }

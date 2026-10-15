@@ -33,12 +33,41 @@ not in the repo. Locally they live in `.dev.vars`, which is gitignored.
 | `STRIPE_SECRET_KEY` | Creates Stripe Checkout sessions for gifts to KNOWN. | Giving fails closed with a 503. |
 | `STRIPE_WEBHOOK_SECRET` | Proves a "payment succeeded" callback really came from Stripe. | Webhook 503s and no gift is ever recorded. |
 | `PERPLEXITY_API_KEY` | Researches real cinemas for a city on the screenings pages. | The page still works; the venue shortlist is simply absent. |
+| `BOXOFFICE_STRIPE_SECRET_KEY` | The box office's own Stripe key, so the tour can run on a test key while donations stay live. Falls back to `STRIPE_SECRET_KEY`. | Box office checkout fails closed with a 503. |
+| `BOXOFFICE_LIVE` | Must be the string `true` before the box office will use an `sk_live_` key. | A live key is refused and nothing can charge a real card. |
 
 `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are GitHub repository
 secrets on the `production` environment, used by the deploy and migrate
 workflows. The migrate token needs **D1: Edit** — without it you get
 "Authentication error [code: 10000]" even as an account super admin, because
 the error is about token scope rather than account role.
+
+## The box office
+
+`/boxoffice/` — ticketing and merch for the 2027 tour. Three faces on one app:
+
+| | |
+| --- | --- |
+| **Public** | `/boxoffice/` and `/boxoffice/<stop>/` — mobile-first, no account, Stripe Checkout (cards plus Apple/Google Pay). Tickets arrive by email, one QR per seat. |
+| **Door** | `/boxoffice/door/` — scan, will-call by name, sell at the window. Admin sign-in. |
+| **Admin** | `/admin/boxoffice/` — stops, promo codes, per-stop reports, refunds, inventory. |
+
+**Open a stop in door mode while you still have signal.** It caches the whole
+will-call list, every ticket code and the price list into IndexedDB, then works
+with nothing. Check-ins and cash sales queue locally and sync when the signal
+comes back; both are idempotent, so a replayed queue cannot sell a seat or
+admit a person twice. Card sales need a connection — the buyer scans a QR and
+pays on their own phone. Cash is the offline path.
+
+**Money.** Everything is integer cents. Stripe fees are read off the balance
+transaction rather than estimated from 2.9% + 30¢, because the published rate
+is not what lands and a tithe computed from a rate card is wrong at every stop.
+Net is gross less refunds, fees and the house; the tithe is 10% of net, and nil
+when a stop does not clear. The free-will offering is entered by hand after the
+show and passed on whole, so it is reported but never counted as retained.
+
+**Test first.** The box office refuses an `sk_live_` key unless `BOXOFFICE_LIVE`
+is explicitly `true`, so a rehearsal cannot charge a real card.
 
 ## Workflows
 

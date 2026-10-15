@@ -1,0 +1,157 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { hasSession } from '../../../lib/admin';
+import { stopTotals } from '../../../lib/boxoffice-report';
+import { stock } from '../../../lib/boxoffice-report';
+import { TOUR, money, showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const stops = await stopTotals();
+const lowStock = (await stock()).filter((s) => s.low);
+
+const legs = [...new Set(stops.map((s) => s.leg ?? 'Unassigned'))];
+const sum = (f: (s: (typeof stops)[number]) => number) => stops.reduce((n, s) => n + f(s), 0);
+
+const tour = {
+  gross: sum((s) => s.gross_cents),
+  refunded: sum((s) => s.refunded_cents),
+  fees: sum((s) => s.fees_cents),
+  rental: sum((s) => s.rental_cents),
+  net: sum((s) => s.net_cents),
+  tithe: sum((s) => s.tithe_cents),
+  offering: sum((s) => s.offering_cents),
+  attendees: sum((s) => s.attendees),
+  checkedIn: sum((s) => s.checked_in),
+  capacity: sum((s) => s.capacity),
+};
+// Blended across the tour, so a 90-seat room and a 670-seat room are weighted
+// by the people in them rather than averaged as if they were the same stop.
+const perHead = tour.attendees
+  ? Math.round((tour.gross - tour.refunded) / tour.attendees)
+  : 0;
+---
+
+<Admin title="Box office">
+  <h1>Box office</h1>
+  <p class="sub">
+    The {TOUR.year} tour — {stops.length} {stops.length === 1 ? 'stop' : 'stops'} on the books.
+  </p>
+
+  <div class="tiles">
+    <div class="tile">
+      <p class="label">Gross</p>
+      <p class="tile__n num">{money(tour.gross - tour.refunded)}</p>
+      <p class="tile__note">{money(tour.refunded)} refunded</p>
+    </div>
+    <div class="tile">
+      <p class="label">Net after fees &amp; houses</p>
+      <p class="tile__n num">{money(tour.net)}</p>
+      <p class="tile__note">{money(tour.fees)} Stripe · {money(tour.rental)} rental</p>
+    </div>
+    <div class="tile">
+      <p class="label">Tithe at {TOUR.tithePercent}%</p>
+      <p class="tile__n num">{money(tour.tithe)}</p>
+      <p class="tile__note">{money(tour.offering)} offerings collected</p>
+    </div>
+    <div class="tile">
+      <p class="label">Attendees</p>
+      <p class="tile__n num">{tour.attendees.toLocaleString()}</p>
+      <p class="tile__note">
+        {tour.checkedIn.toLocaleString()} walked in · {money(perHead)} each
+      </p>
+    </div>
+  </div>
+
+  {!!lowStock.length && (
+    <p class="warn">
+      Low stock:{' '}
+      {lowStock.map((s) => `${s.sku}${s.size ? ` ${s.size}` : ''} (${s.on_hand})`).join(', ')} —
+      <a href="/admin/boxoffice/inventory/">counts</a>
+    </p>
+  )}
+
+  <p class="acts">
+    <a class="btn" href="/admin/boxoffice/event/">New stop</a>
+    <a class="lnk" href="/admin/boxoffice/codes/">Promo codes</a>
+    <a class="lnk" href="/admin/boxoffice/inventory/">Inventory</a>
+    <a class="lnk" href="/boxoffice/door/">Door mode</a>
+    <a class="lnk" href="/api/admin/boxoffice/export?what=tour">Tour CSV</a>
+  </p>
+
+  {legs.map((leg) => {
+    const rows = stops.filter((s) => (s.leg ?? 'Unassigned') === leg);
+    const legNet = rows.reduce((n, s) => n + s.net_cents, 0);
+    return (
+      <section>
+        <h2>{leg} <span class="legnet">{money(legNet)} net</span></h2>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Stop</th><th>When</th>
+                <th class="right">Sold</th><th class="right">In</th>
+                <th class="right">Gross</th><th class="right">Fees</th>
+                <th class="right">Rental</th><th class="right">Net</th>
+                <th class="right">Tithe</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr>
+                  <td>
+                    <strong>{s.venue}</strong><br />
+                    <span class="muted">{s.city}{s.region ? `, ${s.region}` : ''}</span>
+                  </td>
+                  <td class="num">{showTime(s.starts_at)}</td>
+                  <td class="right num">{s.attendees}/{s.capacity}</td>
+                  <td class="right num">{s.checked_in}</td>
+                  <td class="right num">{money(s.gross_cents - s.refunded_cents)}</td>
+                  <td class="right num">{money(s.fees_cents)}</td>
+                  <td class="right num">{money(s.rental_cents)}</td>
+                  <td class={`right num ${s.net_cents < 0 ? 'bad' : ''}`}>{money(s.net_cents)}</td>
+                  <td class="right num">{money(s.tithe_cents)}</td>
+                  <td class="right">
+                    <a href={`/admin/boxoffice/report/?slug=${s.slug}`}>report</a><br />
+                    <a href={`/admin/boxoffice/event/?slug=${s.slug}`}>edit</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  })}
+
+  {!stops.length && <p class="empty">No stops yet. Add the first one.</p>}
+</Admin>
+
+<style>
+  .tiles {
+    display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin: 1.5rem 0;
+  }
+  .tile { border: 1px solid var(--rule); border-radius: 4px; padding: 1.1rem 1.2rem; }
+  .tile__n { font-size: 1.7rem; margin: .4rem 0 .2rem; font-weight: 600; letter-spacing: -.02em; }
+  .tile__note { margin: 0; color: var(--faint); font-size: .78rem; }
+
+  .warn {
+    border: 1px solid #7a5a1f; background: #241c0c; color: #e8c98a;
+    border-radius: 4px; padding: .7rem .9rem; font-size: .88rem;
+  }
+  .warn a { color: inherit; }
+
+  .acts { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1.5rem 0; }
+  .btn {
+    background: var(--blood); color: #fff; text-decoration: none;
+    padding: .55rem 1rem; border-radius: 3px; font-size: .85rem; font-weight: 600;
+  }
+  .lnk { color: var(--dim); font-size: .85rem; }
+  .legnet { font-size: .78rem; color: var(--faint); font-weight: 400; margin-left: .6rem; }
+  .muted { color: var(--faint); font-size: .8rem; }
+  .bad { color: #e08a8a; }
+</style>

@@ -1,0 +1,188 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  /** Door and ticket screens are tools, not pages: no chrome, no footer. */
+  bare?: boolean;
+  wide?: boolean;
+}
+const { title, description = '', bare = false, wide = false } = Astro.props;
+---
+
+{/*
+  The box office runs on its own shell rather than Base.astro.
+
+  Base carries an intro animation, a scroll-reveal gate that hides content
+  until JavaScript runs, prefetching and JSON-LD. On a ticket page opened in a
+  theatre lobby on one bar of signal, every one of those is a liability. This
+  shell is one file, no fonts to block paint beyond the two the film uses, and
+  it renders the whole page without script.
+
+  The palette is the film's: lantern brass, parchment, oxblood, and a ground
+  the colour of a dark room.
+*/}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="theme-color" content="#17110D" />
+    {bare && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Rye&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Special+Elite&display=swap"
+    />
+  </head>
+  <body class={bare ? 'bare' : ''}>
+    {!bare && (
+      <header class="top">
+        <a href="/" class="top__mark">4est Films</a>
+        <a href="/boxoffice/" class="top__tour">The 2027 Tour</a>
+      </header>
+    )}
+
+    <main class={wide ? 'wrap wrap--wide' : 'wrap'}><slot /></main>
+
+    {!bare && (
+      <footer class="foot">
+        <p>
+          <a href="/films/his-name-is-michael/">About the film</a> ·
+          <a href="/boxoffice/">All stops</a> ·
+          <a href="mailto:hello@4estfilms.studio">hello@4estfilms.studio</a>
+        </p>
+        <p class="foot__fine">
+          A 4est Films production. Tickets are sold by 4est Films; card payments
+          are handled by Stripe and we never see your card.
+        </p>
+      </footer>
+    )}
+
+    <style is:global>
+      :root {
+        --ground: #17110d;
+        --ground-2: #1f1712;
+        --ground-3: #2a201a;
+        --parchment: #f2e8d0;
+        --parchment-dim: #cfc1a4;
+        --warm: #9c8a72;
+        --brass: #b08d3c;
+        --brass-lift: #d8b253;
+        --blood: #96001f;
+        --blood-lift: #c4082e;
+        --rule: rgba(176, 141, 60, 0.3);
+        --ok: #6f9b63;
+        --display: Rye, Georgia, serif;
+        --body: 'Crimson Pro', Georgia, 'Times New Roman', serif;
+        --mono: 'Special Elite', ui-monospace, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      /* Any `display` rule beats the hidden attribute, so a hidden flex row
+         stays visible. The discount line showed "-$0.00" until this existed. */
+      [hidden] { display: none !important; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--parchment);
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--brass-lift); }
+      img { max-width: 100%; }
+
+      .wrap {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.1rem 4rem;
+      }
+      .wrap--wide { max-width: 62rem; }
+
+      .top {
+        display: flex; justify-content: space-between; align-items: baseline;
+        gap: 1rem; padding: .9rem 1.1rem; border-bottom: 1px solid var(--rule);
+      }
+      .top__mark {
+        font-family: var(--display); font-size: 1.05rem; color: var(--parchment);
+        text-decoration: none; letter-spacing: .01em;
+      }
+      .top__tour {
+        font-family: var(--mono); font-size: .64rem; letter-spacing: .22em;
+        text-transform: uppercase; color: var(--brass); text-decoration: none;
+      }
+
+      .eyebrow {
+        font-family: var(--mono); font-size: .62rem; letter-spacing: .26em;
+        text-transform: uppercase; color: var(--brass); margin: 0 0 .5rem;
+      }
+      h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.12; }
+      h1 { font-size: clamp(1.8rem, 7vw, 2.6rem); margin: 0 0 .4rem; }
+      h2 { font-size: 1.25rem; margin: 2rem 0 .8rem; }
+      .dim { color: var(--parchment-dim); }
+      .fine { font-size: .84rem; color: var(--warm); }
+
+      /* Buttons are big because they are pressed in the dark, standing up,
+         one-handed, by someone holding a drink. */
+      .btn {
+        display: block; width: 100%; text-align: center;
+        background: var(--blood); border: 1px solid var(--blood);
+        color: #fff; font-family: var(--mono); font-size: .82rem;
+        letter-spacing: .18em; text-transform: uppercase;
+        padding: 1.05rem 1.2rem; border-radius: 3px;
+        cursor: pointer; text-decoration: none;
+        min-height: 3.2rem;
+      }
+      .btn:hover:not(:disabled) { background: var(--blood-lift); }
+      .btn:disabled { opacity: .5; cursor: progress; }
+      .btn--quiet {
+        background: transparent; border-color: var(--rule); color: var(--parchment);
+      }
+      .btn--quiet:hover:not(:disabled) { background: var(--ground-2); border-color: var(--brass); }
+
+      input, select, textarea, button { font: inherit; }
+      .field { display: block; margin-bottom: 1rem; }
+      .field > span {
+        display: block; font-family: var(--mono); font-size: .6rem;
+        letter-spacing: .18em; text-transform: uppercase; color: var(--warm);
+        margin-bottom: .35rem;
+      }
+      input[type=text], input[type=email], input[type=search],
+      input[type=number], input[type=tel], select, textarea {
+        width: 100%; background: var(--ground-2); color: var(--parchment);
+        border: 1px solid var(--rule); border-radius: 3px;
+        padding: .8rem .75rem; min-height: 3rem;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: 0; border-color: var(--brass);
+      }
+
+      .note {
+        border-left: 2px solid var(--brass); padding: .5rem 0 .5rem .85rem;
+        margin: 1rem 0; color: var(--parchment-dim); font-size: .95rem;
+      }
+      .note--bad { border-left-color: var(--blood-lift); color: #e9b4b4; }
+      .note--good { border-left-color: var(--ok); }
+
+      .foot {
+        border-top: 1px solid var(--rule); margin-top: 3rem;
+        padding: 1.5rem 1.1rem 3rem; text-align: center;
+      }
+      .foot p { margin: 0 0 .6rem; font-size: .9rem; color: var(--warm); }
+      .foot a { margin: 0 .3rem; }
+      .foot__fine { font-size: .76rem; }
+
+      body.bare .wrap { padding-top: .9rem; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
+    </style>
+    <slot name="head-end" />
+  </body>
+</html>

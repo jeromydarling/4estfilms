@@ -42,5 +42,8 @@ Allow: /
 Disallow: /api/
 Disallow: /media/
 Disallow: /admin/
+Disallow: /boxoffice/door/
+Disallow: /boxoffice/t/
+Disallow: /boxoffice/qr/
 
 Sitemap: https://4estfilms.studio/sitemap.xml

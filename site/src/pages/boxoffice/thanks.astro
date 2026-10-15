@@ -1,0 +1,51 @@
+---
+import BoxOffice from '../../layouts/BoxOffice.astro';
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+/**
+ * Deliberately says nothing about what was bought.
+ *
+ * The success URL carries a session id anyone could invent, so this page
+ * treats it as decoration and never as proof of payment. The webhook is the
+ * only thing that mints a ticket; the email is the thing that proves it.
+ *
+ * The one real lookup is whether the webhook has landed yet, so somebody
+ * staring at this screen knows whether to wait or to write to us.
+ */
+const session = (Astro.url.searchParams.get('session') ?? '').slice(0, 120);
+let found = false;
+if (/^cs_[A-Za-z0-9_]+$/.test(session) && env.DB) {
+  const row = await env.DB
+    .prepare(`SELECT id FROM bo_orders WHERE stripe_session_id = ?1`)
+    .bind(session)
+    .first<{ id: number }>();
+  found = Boolean(row);
+}
+---
+
+<BoxOffice title="Thank you — 4est Films" description="Your tickets are on the way.">
+  <p class="eyebrow">Paid</p>
+  <h1>Thank you. We’ll see you there.</h1>
+
+  {found ? (
+    <p class="note note--good">
+      Your tickets are in your inbox, one code per seat. Show a code at the
+      door — on your phone or printed.
+    </p>
+  ) : (
+    <p class="note">
+      Your tickets are being issued now and will land in your inbox within a
+      minute or two. You don’t need to stay on this page.
+    </p>
+  )}
+
+  <p class="dim">
+    If nothing arrives, check the spam folder first, then write to
+    <a href="mailto:hello@4estfilms.studio">hello@4estfilms.studio</a> and we’ll
+    find you. We can always check you in by name at the door.
+  </p>
+
+  <p style="margin-top:2rem"><a class="btn btn--quiet" href="/boxoffice/">The rest of the tour</a></p>
+</BoxOffice>

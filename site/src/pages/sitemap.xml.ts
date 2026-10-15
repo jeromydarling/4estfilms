@@ -11,6 +11,7 @@ const PAGES: [path: string, priority: string, changefreq: string][] = [
   ['/films/strung/', '0.8', 'monthly'],
   ['/screenings/', '0.8', 'daily'],
   ['/known/', '0.8', 'monthly'],
+  ['/boxoffice/', '0.9', 'weekly'],
   ['/premiere/', '0.7', 'weekly'],
   ['/press/', '0.7', 'monthly'],
   ['/about/', '0.6', 'yearly'],

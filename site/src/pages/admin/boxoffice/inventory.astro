@@ -1,0 +1,68 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { hasSession } from '../../../lib/admin';
+import { stock } from '../../../lib/boxoffice-report';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+const rows = await stock();
+const low = rows.filter((r) => r.low);
+const negative = rows.filter((r) => r.on_hand < 0);
+---
+
+<Admin title="Inventory">
+  <h1>Inventory</h1>
+  <p class="sub">
+    Counts fall as things sell, including items inside packages, and go back up
+    on a refund.
+  </p>
+
+  {!!negative.length && (
+    <p class="err">
+      Oversold: {negative.map((r) => `${r.sku}${r.size ? ` ${r.size}` : ''} (${r.on_hand})`).join(', ')}.
+      Either a count is stale or we sold stock we did not have.
+    </p>
+  )}
+  {!!low.length && !negative.length && (
+    <p class="warn">
+      Running low: {low.map((r) => `${r.sku}${r.size ? ` ${r.size}` : ''} (${r.on_hand})`).join(', ')}.
+    </p>
+  )}
+
+  <form method="post" action="/api/admin/boxoffice/inventory">
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Item</th><th>Size</th><th class="right">On hand</th><th class="right">Warn at</th><th></th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr class={r.on_hand < 0 ? 'bad' : r.low ? 'warnrow' : ''}>
+              <td>{r.sku}</td>
+              <td class="num">{r.size || '—'}</td>
+              <td class="right"><input name={`on_hand[${r.sku}|${r.size}]`} type="number" value={String(r.on_hand)} /></td>
+              <td class="right"><input name={`low_at[${r.sku}|${r.size}]`} type="number" value={String(r.low_at)} /></td>
+              <td>{r.on_hand < 0 ? 'oversold' : r.low ? 'low' : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="acts"><button type="submit">Save counts</button>
+      <a class="lnk" href="/admin/boxoffice/">← Box office</a></p>
+  </form>
+</Admin>
+
+<style>
+  input { width: 6rem; background: var(--ink-2); border: 1px solid var(--rule);
+          border-radius: 3px; color: var(--bone); font: inherit; padding: .4rem .5rem; text-align: right; }
+  .warn { border: 1px solid #7a5a1f; background: #241c0c; color: #e8c98a;
+          padding: .6rem .8rem; border-radius: 4px; font-size: .88rem; }
+  .err { border: 1px solid #7a2630; background: #260f12; color: #e9b4b4;
+         padding: .6rem .8rem; border-radius: 4px; font-size: .88rem; }
+  .warnrow td:first-child { color: #e8c98a; }
+  .bad td:first-child { color: #e08a8a; }
+  .acts { display: flex; gap: 1.2rem; align-items: center; margin-top: 1.2rem; }
+  button { background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+           font: inherit; font-weight: 600; padding: .6rem 1.2rem; cursor: pointer; }
+  .lnk { color: var(--dim); font-size: .85rem; }
+</style>

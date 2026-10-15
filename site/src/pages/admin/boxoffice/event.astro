@@ -1,0 +1,130 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { hasSession } from '../../../lib/admin';
+import { getEvent, getOffered, getProducts } from '../../../lib/boxoffice-db';
+import { TOUR, money } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const slug = Astro.url.searchParams.get('slug') ?? '';
+const event = slug ? await getEvent(slug) : null;
+const products = await getProducts();
+const offered = event ? await getOffered(event.id) : new Map<string, number | null>();
+// A new stop offers everything; trimming is a deliberate act.
+const isNew = !event;
+const error = Astro.url.searchParams.get('error');
+---
+
+<Admin title={event ? `Edit ${event.venue}` : 'New stop'}>
+  <h1>{event ? event.venue : 'New stop'}</h1>
+  <p class="sub">{event ? 'Editing an existing stop.' : `A stop on the ${TOUR.year} tour.`}</p>
+
+  {error === 'required' && <p class="err">Venue, city and showtime are all required.</p>}
+  {error === 'slug' && <p class="err">That URL slug can’t be used.</p>}
+
+  <form method="post" action="/api/admin/boxoffice/event">
+    <input type="hidden" name="slug" value={event?.slug ?? ''} />
+
+    <div class="grid">
+      <label><span class="label">Venue</span>
+        <input name="venue" required value={event?.venue ?? ''} /></label>
+      <label><span class="label">City</span>
+        <input name="city" required value={event?.city ?? ''} /></label>
+      <label><span class="label">State</span>
+        <input name="region" value={event?.region ?? ''} maxlength="10" /></label>
+      <label><span class="label">URL slug</span>
+        <input name="new_slug" value={event?.slug ?? ''} placeholder="omaha-orpheum" />
+        <span class="hint">4estfilms.studio/boxoffice/<em>slug</em></span></label>
+    </div>
+
+    <div class="grid">
+      <label><span class="label">Showtime</span>
+        <input name="starts_at" required value={event?.starts_at ?? ''}
+               placeholder="2027-03-12T19:30:00-06:00" />
+        <span class="hint">With the town’s own UTC offset, so 7:30pm means 7:30pm there.</span></label>
+      <label><span class="label">Doors</span>
+        <input name="doors_at" value={event?.doors_at ?? ''}
+               placeholder="2027-03-12T18:45:00-06:00" /></label>
+      <label><span class="label">Capacity</span>
+        <input name="capacity" type="number" min="0" required value={String(event?.capacity ?? '')} /></label>
+      <label><span class="label">Rental for the house</span>
+        <input name="rental" value={event ? (event.rental_cents / 100).toFixed(2) : ''}
+               placeholder="1850.00" />
+        <span class="hint">Reporting only. Never shown publicly.</span></label>
+    </div>
+
+    <div class="grid">
+      <label><span class="label">Leg</span>
+        <input name="leg" value={event?.leg ?? ''} placeholder="Dakota opening" /></label>
+      <label><span class="label">Status</span>
+        <select name="status">
+          {['draft', 'on_sale', 'closed', 'past'].map((s) => (
+            <option value={s} selected={(event?.status ?? 'draft') === s}>{s.replace('_', ' ')}</option>
+          ))}
+        </select>
+        <span class="hint">Nothing sells unless this says on sale.</span></label>
+    </div>
+
+    <label><span class="label">Blurb</span>
+      <textarea name="blurb" rows="3">{event?.blurb ?? ''}</textarea></label>
+    <label><span class="label">Poster image path</span>
+      <input name="poster" value={event?.poster ?? '/og/hnim.jpg'} /></label>
+    <label><span class="label">Private notes</span>
+      <textarea name="notes" rows="2">{event?.notes ?? ''}</textarea></label>
+
+    <h2>What this stop sells</h2>
+    <p class="hint">
+      Leave a price blank to use the catalogue price. A number here overrides it
+      for this stop only.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Offer</th><th>Item</th><th class="right">Catalogue</th><th>Price here</th></tr></thead>
+        <tbody>
+          {[...products.values()].map((p) => (
+            <tr>
+              <td><input type="checkbox" name={`offer_${p.sku}`}
+                         checked={isNew || offered.has(p.sku)} /></td>
+              <td>{p.name} {p.admits > 0 && <span class="muted">· admits {p.admits}</span>}</td>
+              <td class="right num">{money(p.price_cents)}</td>
+              <td><input class="price" name={`price_${p.sku}`}
+                         value={offered.get(p.sku) ? ((offered.get(p.sku) as number) / 100).toFixed(2) : ''}
+                         placeholder="—" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="acts">
+      <button type="submit">{event ? 'Save stop' : 'Create stop'}</button>
+      <a class="lnk" href="/admin/boxoffice/">Cancel</a>
+    </p>
+  </form>
+</Admin>
+
+<style>
+  form { max-width: 52rem; }
+  .grid { display: grid; gap: 0 1.2rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  label { display: block; margin-bottom: 1.1rem; }
+  .label { display: block; margin-bottom: .35rem; }
+  input, select, textarea {
+    width: 100%; background: var(--ink-2); border: 1px solid var(--rule);
+    border-radius: 3px; color: var(--bone); font: inherit; padding: .55rem .7rem;
+  }
+  input[type=checkbox] { width: auto; }
+  input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--blood); }
+  .hint { display: block; color: var(--faint); font-size: .76rem; margin-top: .3rem; }
+  .price { max-width: 8rem; }
+  .muted { color: var(--faint); font-size: .8rem; }
+  .err { border: 1px solid #7a2630; background: #260f12; color: #e9b4b4;
+         padding: .6rem .8rem; border-radius: 4px; font-size: .88rem; }
+  .acts { display: flex; gap: 1.2rem; align-items: center; margin-top: 1.5rem; }
+  button {
+    background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+    font: inherit; font-weight: 600; padding: .65rem 1.2rem; cursor: pointer;
+  }
+  .lnk { color: var(--dim); font-size: .85rem; }
+</style>
