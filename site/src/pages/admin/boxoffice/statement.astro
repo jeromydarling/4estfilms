@@ -1,0 +1,129 @@
+---
+import { hasSession } from '../../../lib/admin';
+import { getEvent } from '../../../lib/boxoffice-db';
+import { settlementsAt, stopTotals } from '../../../lib/boxoffice-report';
+import { TOUR, money, showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * The settlement statement: one sheet to hand the pastor.
+ *
+ * Everything the report knows, arranged the way a treasurer reads it, with
+ * the payments made and the balance at the bottom. White on paper, like the
+ * sign; this is a document, not a screen.
+ */
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const event = await getEvent(Astro.url.searchParams.get('slug') ?? '');
+if (!event) return Astro.redirect('/admin/boxoffice/');
+
+const [[t], payments] = await Promise.all([stopTotals(event.id), settlementsAt(event.id)]);
+const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+const today = new Date().toISOString().slice(0, 10);
+const parishPaid = t.tithe_paid_cents + t.offering_paid_cents;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Settlement — {event.venue}</title>
+  </head>
+  <body>
+    <button class="print" type="button" onclick="print()">Print</button>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Settlement statement</p>
+          <h1>{event.venue}</h1>
+          <p class="sub">{city} · {showTime(event.starts_at)}</p>
+        </div>
+        <div class="from">
+          <strong>4est Films</strong><br />{TOUR.film}, the {TOUR.year} tour<br />
+          hello@4estfilms.studio<br />Prepared {today}
+        </div>
+      </header>
+
+      <h2>Attendance</h2>
+      <table>
+        <tr><td>Seats sold</td><td class="r">{t.attendees} of {t.capacity}</td></tr>
+        <tr><td>Of which complimentary</td><td class="r">{t.comp_seats}</td></tr>
+        <tr><td>Checked in at the door</td><td class="r">{t.checked_in}</td></tr>
+      </table>
+
+      <h2>The night’s takings</h2>
+      <table>
+        <tr><td>Gross ticket and merchandise sales</td><td class="r">{money(t.gross_cents)}</td></tr>
+        <tr><td>Less refunds</td><td class="r">−{money(t.refunded_cents)}</td></tr>
+        <tr><td>Less card processing (as charged by Stripe)</td><td class="r">−{money(t.fees_cents)}</td></tr>
+        <tr><td>Less the house rental</td><td class="r">−{money(t.rental_cents)}</td></tr>
+        <tr class="sum"><td>Net</td><td class="r">{money(t.net_cents)}</td></tr>
+        <tr><td>Tithe to the parish at {TOUR.tithePercent}% of net{t.net_cents <= 0 ? ' (nil — the night did not clear)' : ''}</td>
+            <td class="r">{money(t.tithe_cents)}</td></tr>
+      </table>
+
+      <h2>Free-will offering</h2>
+      <table>
+        <tr><td>Cash, counted after the show</td><td class="r">{money(t.offering_cents)}</td></tr>
+        <tr><td>By card through the QR, {t.offerings} {t.offerings === 1 ? 'gift' : 'gifts'}</td><td class="r">{money(t.offering_card_cents)}</td></tr>
+        <tr><td>Less card processing on those gifts</td><td class="r">−{money(t.offering_fees_cents)}</td></tr>
+        <tr class="sum"><td>Offering passed to the parish</td><td class="r">{money(t.offering_passed_cents)}</td></tr>
+      </table>
+
+      <h2>Owed to the parish</h2>
+      <table>
+        <tr><td>Tithe</td><td class="r">{money(t.tithe_cents)}</td></tr>
+        <tr><td>Offering</td><td class="r">{money(t.offering_passed_cents)}</td></tr>
+        <tr class="sum"><td>Total owed</td><td class="r">{money(t.parish_cents)}</td></tr>
+        {payments.filter((p) => p.kind !== 'rental').map((p) => (
+          <tr><td>Paid {p.paid_at}{p.method ? ` by ${p.method}` : ''}{p.note ? ` — ${p.note}` : ''} ({p.kind})</td>
+              <td class="r">−{money(p.amount_cents)}</td></tr>
+        ))}
+        <tr class="sum big"><td>Balance {t.parish_due_cents < 0 ? 'overpaid' : 'due to the parish'}</td>
+            <td class="r">{money(Math.abs(t.parish_due_cents))}</td></tr>
+      </table>
+      {parishPaid === 0 && <p class="fine">No payments recorded yet.</p>}
+
+      {!!t.rental_cents && (
+        <>
+          <h2>The house</h2>
+          <table>
+            <tr><td>Rental agreed</td><td class="r">{money(t.rental_cents)}</td></tr>
+            <tr><td>Paid</td><td class="r">{money(t.rental_paid_cents)}</td></tr>
+            <tr class="sum"><td>Balance</td><td class="r">{money(t.rental_cents - t.rental_paid_cents)}</td></tr>
+          </table>
+        </>
+      )}
+
+      <p class="fine foot">
+        Card processing is the fee Stripe actually charged on each transaction, not an estimate.
+        Sales tax collected on this stop ({money(t.tax_cents)}) is remitted by 4est Films and is not in any figure above.
+      </p>
+    </main>
+  </body>
+</html>
+
+<style is:global>
+  @page { margin: 0.7in; }
+  html, body { margin: 0; background: #fff; color: #17110D; }
+  body { font-family: Georgia, 'Times New Roman', serif; padding: 2rem 1.2rem; font-size: 14px; }
+  main { max-width: 44rem; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; gap: 2rem; align-items: flex-start; border-bottom: 2px solid #17110D; padding-bottom: 1rem; }
+  .eyebrow { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: #7a5a1e; margin: 0 0 .3rem; }
+  h1 { margin: 0; font-size: 1.9rem; font-weight: 400; }
+  .sub { margin: .3rem 0 0; color: #5a5048; }
+  .from { text-align: right; font-size: .85rem; color: #3b332c; line-height: 1.5; }
+  h2 { font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; color: #7a5a1e; margin: 1.6rem 0 .4rem; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: .35rem 0; border-bottom: 1px solid #e4ddd0; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sum td { border-top: 1.5px solid #17110D; font-weight: 600; }
+  .big td { font-size: 1.1rem; }
+  .fine { font-size: .8rem; color: #6b6259; }
+  .foot { margin-top: 2rem; border-top: 1px solid #e4ddd0; padding-top: .8rem; }
+  .print { position: fixed; top: 1rem; right: 1rem; font: inherit; padding: .5rem 1rem; background: #17110D; color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+  @media print { .print { display: none; } body { padding: 0; } }
+</style>

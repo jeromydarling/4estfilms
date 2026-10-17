@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { getEventById, getOffered, getProducts, recordOrder } from './boxoffice-db';
-import { money, priceBasket, showTime, stripeKey, type BasketLine } from './boxoffice';
-import { layout, newToken, send, SITE } from './email';
+import { TOUR, money, priceBasket, showTime, stripeKey, type BasketLine } from './boxoffice';
+import { confirmEmail, layout, newToken, send, SITE } from './email';
 import type { CheckoutSession } from './stripe';
 
 /**
@@ -69,8 +69,10 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   }
 
   // Stripe's own total is the truth about what was taken — it carries the
-  // coupon. Our subtotal is what the items came to before it.
-  const total = typeof s.amount_total === 'number' ? s.amount_total : priced.total_cents;
+  // coupon. Sales tax is taken out of it first: the tax is remitted, not
+  // earned, and gross has to mean the price of the seats.
+  const tax = Math.max(0, s.total_details?.amount_tax ?? 0);
+  const total = (typeof s.amount_total === 'number' ? s.amount_total : priced.total_cents) - tax;
   const discount = Math.max(0, priced.subtotal_cents - total);
 
   let fee = 0;
@@ -90,8 +92,12 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
     discount_cents: discount,
     total_cents: total,
     fee_cents: fee,
+    tax_cents: tax,
     promo_code: s.metadata?.promo_code ?? null,
-    channel: 'web',
+    // The door's card sales come through here too, flagged when the session
+    // was opened, so the report can tell presale from walk-up.
+    channel: s.metadata?.door === '1' ? 'door_card' : 'web',
+    operator: s.metadata?.operator || null,
     buyer_name: buyerName,
     buyer_email: s.customer_details?.email ?? s.customer_email ?? null,
     stripe_session_id: s.id,
@@ -99,6 +105,16 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   });
 
   if (recorded.duplicate) return new Response('duplicate', { status: 200 });
+
+  // They ticked "keep me posted". Double opt-in like everyone else on the
+  // list: a row and a confirmation email, never a silent subscription.
+  if (s.metadata?.subscribe === '1') {
+    try {
+      await subscribeBuyer(s.customer_details?.email ?? s.customer_email ?? '', buyerName);
+    } catch (err) {
+      console.error('boxoffice subscribe failed', { session: s.id, err });
+    }
+  }
 
   // The email is the ticket. If it fails the buyer has paid and cannot get
   // in, so it is logged loudly — but still acknowledged, because a Stripe
@@ -125,7 +141,28 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   return new Response('ok', { status: 200 });
 }
 
-async function sendTickets(t: {
+async function subscribeBuyer(rawEmail: string, name: string | null): Promise<void> {
+  const email = rawEmail.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return;
+  const db = env.DB;
+  await db
+    .prepare(
+      `INSERT INTO subscribers (email, first_name, source, film, token)
+       VALUES (?1, ?2, 'boxoffice', ?3, ?4) ON CONFLICT(email) DO NOTHING`
+    )
+    .bind(email, name?.split(' ')[0] ?? null, TOUR.film, newToken())
+    .run();
+  const row = await db
+    .prepare(`SELECT first_name, token, confirmed_at, unsubscribed_at, confirm_sent_at FROM subscribers WHERE email = ?1`)
+    .bind(email)
+    .first<{ first_name: string | null; token: string | null; confirmed_at: string | null; unsubscribed_at: string | null; confirm_sent_at: string | null }>();
+  if (!row || row.confirmed_at || row.unsubscribed_at || row.confirm_sent_at || !row.token) return;
+  const mail = confirmEmail(row.token, row.first_name);
+  await send({ to: email, token: row.token, campaign: 'confirm', ...mail });
+  await db.prepare(`UPDATE subscribers SET confirm_sent_at = datetime('now') WHERE email = ?1`).bind(email).run();
+}
+
+export async function sendTickets(t: {
   to: string;
   name: string | null;
   codes: string[];

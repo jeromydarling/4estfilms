@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { isAdmin } from '../../../../lib/admin';
 import { getProducts } from '../../../../lib/boxoffice-db';
+import { newHostToken, newPin } from '../../../../lib/door';
 
 export const prerender = false;
 
@@ -48,6 +49,17 @@ export const POST: APIRoute = async ({ request, url }) => {
     return back(`/admin/boxoffice/report/?slug=${encodeURIComponent(slug)}`);
   }
 
+  // A new PIN or host link, when the old one has been shared too widely.
+  // The old one stops working the moment this lands.
+  if (action === 'door_pin' || action === 'host_token') {
+    const slug = str('slug');
+    if (!slug) return back('/admin/boxoffice/');
+    const col = action === 'door_pin' ? 'door_pin' : 'host_token';
+    const val = action === 'door_pin' ? newPin() : newHostToken();
+    await db.prepare(`UPDATE bo_events SET ${col} = ?1 WHERE slug = ?2`).bind(val, slug).run();
+    return back(`/admin/boxoffice/report/?slug=${encodeURIComponent(slug)}`);
+  }
+
   const slugIn = str('slug', 80);
   const newSlug = (str('new_slug', 80) ?? slugIn ?? '')
     .toLowerCase()
@@ -58,6 +70,9 @@ export const POST: APIRoute = async ({ request, url }) => {
   if (!newSlug) return back('/admin/boxoffice/event/?error=slug');
 
   const capacity = Math.max(0, Math.min(100000, Number(f.get('capacity')) || 0));
+  const holds = Math.max(0, Math.min(capacity, Math.floor(Number(f.get('holds')) || 0)));
+  // Digits only; blank means "give me one". Never cleared by an edit.
+  const pinIn = String(f.get('door_pin') ?? '').replace(/\D/g, '').slice(0, 8);
   const fields = {
     slug: newSlug,
     title: str('title') ?? 'His Name is Michael',
@@ -90,26 +105,29 @@ export const POST: APIRoute = async ({ request, url }) => {
       .prepare(
         `UPDATE bo_events SET slug=?1, title=?2, venue=?3, city=?4, region=?5, starts_at=?6,
                 doors_at=?7, capacity=?8, blurb=?9, poster=?10, rental_cents=?11, leg=?12,
-                status=?13, notes=?14
+                status=?13, notes=?14, holds=?16,
+                door_pin = COALESCE(NULLIF(?17, ''), door_pin, ?18),
+                host_token = COALESCE(host_token, ?19)
           WHERE id=?15`
       )
       .bind(
         fields.slug, fields.title, fields.venue, fields.city, fields.region, fields.starts_at,
         fields.doors_at, fields.capacity, fields.blurb, fields.poster, fields.rental_cents,
-        fields.leg, fields.status, fields.notes, existing.id
+        fields.leg, fields.status, fields.notes, existing.id,
+        holds, pinIn, newPin(), newHostToken()
       )
       .run();
   } else {
     await db
       .prepare(
         `INSERT INTO bo_events (slug,title,venue,city,region,starts_at,doors_at,capacity,
-                                blurb,poster,rental_cents,leg,status,notes)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)`
+                                blurb,poster,rental_cents,leg,status,notes,holds,door_pin,host_token)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)`
       )
       .bind(
         fields.slug, fields.title, fields.venue, fields.city, fields.region, fields.starts_at,
         fields.doors_at, fields.capacity, fields.blurb, fields.poster, fields.rental_cents,
-        fields.leg, fields.status, fields.notes
+        fields.leg, fields.status, fields.notes, holds, pinIn || newPin(), newHostToken()
       )
       .run();
   }

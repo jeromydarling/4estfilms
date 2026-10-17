@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { isAdmin } from '../../../../lib/admin';
+import { canDoor } from '../../../../lib/door';
 import { getEvent, getOffered, getProducts, soldAdmits } from '../../../../lib/boxoffice-db';
 
 export const prerender = false;
@@ -21,11 +21,10 @@ const json = (b: unknown, status = 200) =>
   });
 
 export const GET: APIRoute = async ({ request, url }) => {
-  if (!(await isAdmin(request, url))) return json({ ok: false }, 404);
-
   const slug = url.searchParams.get('slug') ?? '';
   const event = await getEvent(slug);
   if (!event) return json({ ok: false, error: 'No such stop.' }, 404);
+  if (!(await canDoor(request, url, event.id))) return json({ ok: false }, 404);
 
   const db = env.DB;
   const [tickets, orders, products, offered, sold] = await Promise.all([
@@ -40,7 +39,9 @@ export const GET: APIRoute = async ({ request, url }) => {
       .prepare(
         `SELECT o.id, o.buyer_name, o.buyer_email, o.channel, o.total_cents, o.status,
                 (SELECT COUNT(*) FROM bo_tickets t WHERE t.order_id = o.id AND t.void_at IS NULL) AS seats
-           FROM bo_orders o WHERE o.event_id = ?1 ORDER BY o.buyer_name`
+           FROM bo_orders o
+          WHERE o.event_id = ?1 AND o.status IN ('paid', 'refunded')
+          ORDER BY o.buyer_name`
       )
       .bind(event.id)
       .all<Record<string, unknown>>(),
@@ -76,6 +77,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       region: event.region,
       starts_at: event.starts_at,
       capacity: event.capacity,
+      holds: event.holds ?? 0,
       sold,
     },
     catalogue,

@@ -36,6 +36,10 @@ const tour = {
 const perHead = tour.attendees
   ? Math.round((tour.gross - tour.refunded) / tour.attendees)
   : 0;
+// Parishes whose night has happened and who have not yet been paid in full.
+const today = new Date().toISOString().slice(0, 10);
+const owed = stops.filter((s) => s.starts_at.slice(0, 10) < today && s.parish_due_cents > 0);
+const owedCents = owed.reduce((n, s) => n + s.parish_due_cents, 0);
 ---
 
 <Admin title="Box office">
@@ -59,6 +63,11 @@ const perHead = tour.attendees
       <p class="label">Tithe at {TOUR.tithePercent}%</p>
       <p class="tile__n num">{money(tour.tithe)}</p>
       <p class="tile__note">{money(tour.offering)} in offerings · {money(tour.parish)} owed to parishes</p>
+    </div>
+    <div class="tile">
+      <p class="label">Still to pay out</p>
+      <p class="tile__n num">{money(owedCents)}</p>
+      <p class="tile__note">{owed.length ? `${owed.length} ${owed.length === 1 ? 'parish' : 'parishes'} after their night` : 'every past stop is settled'}</p>
     </div>
     <div class="tile">
       <p class="label">Attendees</p>
@@ -93,6 +102,8 @@ const perHead = tour.attendees
     <a class="lnk" href="/boxoffice/door/">Door mode</a>
     <a class="lnk" href="/api/admin/boxoffice/export?what=tour">Tour CSV</a>
     <a class="lnk" href="/api/admin/boxoffice/export?what=offerings">Offerings CSV</a>
+    <button class="lnk linkbtn" type="button" data-digest>Send the digest now</button>
+    <span class="muted" data-digestmsg></span>
   </p>
 
   {legs.map((leg) => {
@@ -168,4 +179,27 @@ const perHead = tour.attendees
   .legnet { font-size: .78rem; color: var(--faint); font-weight: 400; margin-left: .6rem; }
   .muted { color: var(--faint); font-size: .8rem; }
   .bad { color: #e08a8a; }
+</style>
+
+<script>
+  // The morning digest, on demand. Same endpoint the cron hits.
+  const btn = document.querySelector<HTMLButtonElement>('[data-digest]');
+  const msg = document.querySelector<HTMLElement>('[data-digestmsg]');
+  btn?.addEventListener('click', async () => {
+    btn.disabled = true;
+    if (msg) msg.textContent = 'sending…';
+    try {
+      const r = await fetch('/api/admin/boxoffice/digest', { method: 'POST' });
+      const b = (await r.json()) as { ok?: boolean; to?: string; error?: string };
+      if (msg) msg.textContent = b.ok ? `sent to ${b.to}` : (b.error ?? 'failed');
+    } catch {
+      if (msg) msg.textContent = 'failed';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .linkbtn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
 </style>

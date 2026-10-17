@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { isAdmin } from '../../../../lib/admin';
+import { canDoor } from '../../../../lib/door';
 import { getEvent, getOffered, getProducts, recordOrder, soldAdmits } from '../../../../lib/boxoffice-db';
 import { priceBasket, type BasketLine } from '../../../../lib/boxoffice';
 
@@ -49,8 +49,6 @@ interface SaleEntry {
 type Entry = CheckinEntry | SaleEntry;
 
 export const POST: APIRoute = async ({ request, url }) => {
-  if (!(await isAdmin(request, url))) return json({ ok: false }, 404);
-
   let body: { slug?: string; queue?: Entry[] };
   try {
     body = (await request.json()) as typeof body;
@@ -60,6 +58,7 @@ export const POST: APIRoute = async ({ request, url }) => {
 
   const event = await getEvent(String(body.slug ?? ''));
   if (!event) return json({ ok: false, error: 'No such stop.' }, 404);
+  if (!(await canDoor(request, url, event.id))) return json({ ok: false }, 404);
 
   // Sales before check-ins, each in the order they happened. The device keys
   // its queue by UUID, so it arrives in no particular order — and a check-in

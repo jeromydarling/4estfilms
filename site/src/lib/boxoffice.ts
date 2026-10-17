@@ -66,6 +66,34 @@ export interface EventRow {
   leg: string | null;
   status: string;
   notes: string | null;
+  /** Four digits that open this stop's door and nothing else. */
+  door_pin: string | null;
+  /** Opens the parish coordinator's read-only page. */
+  host_token: string | null;
+  /** Seats kept off the web. The door can still sell them. */
+  holds: number;
+}
+
+/**
+ * Sales tax, through Stripe Tax, when the tour is ready for it.
+ *
+ * Off unless BOXOFFICE_TAX is 'true', because enabling automatic tax on a
+ * Checkout session fails outright if Stripe Tax has not been switched on in
+ * the dashboard — and a tour that cannot sell a ticket is worse than one
+ * that owes a state a form.
+ *
+ * Tickets use Stripe's own default for ticket sales (General – Services) and
+ * merch the general tangible-goods code. The admission-specific codes need a
+ * venue location on every line item that Checkout cannot carry; for a state
+ * with a venue-sourced amusement tax, that is the thing to come back for.
+ */
+export function taxConfig(): { enabled: boolean; ticket: string; merch: string } {
+  const e = env as unknown as Record<string, string | undefined>;
+  return {
+    enabled: e.BOXOFFICE_TAX === 'true',
+    ticket: e.BOXOFFICE_TAX_CODE_TICKET || 'txcd_20030000',
+    merch: e.BOXOFFICE_TAX_CODE_MERCH || 'txcd_99999999',
+  };
 }
 
 /** What the browser posts: a basket of SKUs, with sizes where they matter. */
@@ -250,6 +278,17 @@ export interface StopReport {
   retained_cents: number;
   attendees: number;
   checked_in: number;
+  /** Seats given away. Inside attendees; outside gross. */
+  comp_seats: number;
+  /** Seats an unpaid group invoice is holding. Counted against capacity. */
+  reserved_admits: number;
+  /** Sales tax Stripe collected. Remitted, not revenue. */
+  tax_cents: number;
+  tithe_paid_cents: number;
+  offering_paid_cents: number;
+  rental_paid_cents: number;
+  /** What the parish is still owed: the tithe and offering less what went out. */
+  parish_due_cents: number;
   revenue_per_attendee_cents: number;
 }
 
@@ -265,6 +304,12 @@ export function stopReport(input: {
   offerings: number;
   attendees: number;
   checked_in: number;
+  comp_seats: number;
+  reserved_admits: number;
+  tax_cents: number;
+  tithe_paid_cents: number;
+  offering_paid_cents: number;
+  rental_paid_cents: number;
 }): StopReport {
   const net =
     input.gross_cents - input.refunded_cents - input.fees_cents - input.rental_cents;
@@ -285,6 +330,7 @@ export function stopReport(input: {
     tithe_cents: tithe,
     offering_passed_cents: passed,
     parish_cents: tithe + passed,
+    parish_due_cents: tithe + passed - input.tithe_paid_cents - input.offering_paid_cents,
     retained_cents: net - tithe,
     revenue_per_attendee_cents: input.attendees
       ? Math.round((input.gross_cents - input.refunded_cents) / input.attendees)

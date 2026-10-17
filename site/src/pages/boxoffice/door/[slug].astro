@@ -1,15 +1,19 @@
 ---
 import BoxOffice from '../../../layouts/BoxOffice.astro';
 import { hasSession } from '../../../lib/admin';
+import { doorEvent } from '../../../lib/door';
 import { getEvent } from '../../../lib/boxoffice-db';
 import { TOUR, showTime } from '../../../lib/boxoffice';
 
 export const prerender = false;
 
-if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
-
 const event = await getEvent(String(Astro.params.slug ?? ''));
 if (!event) return new Response('Not found', { status: 404 });
+
+// The admin, or a volunteer who typed this stop's PIN. A PIN for another
+// stop gets the gate, not a redirect: the volunteer is standing at this door.
+const admin = await hasSession(Astro.request);
+const allowed = admin || (await doorEvent(Astro.request)) === event.id;
 
 const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
 ---
@@ -23,7 +27,24 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
   and goes rather than a thing that is there.
 */}
 <BoxOffice title={`Door — ${event.venue}`} bare wide>
-  <div class="door">
+  {!allowed ? (
+    <div class="gate" data-gate data-slug={event.slug}>
+      <p class="eyebrow">Door · {showTime(event.starts_at)}</p>
+      <h1 class="dhead__venue">{event.venue}</h1>
+      <p class="dim">{city}</p>
+      <form class="pinform" data-pinform>
+        <label class="field">
+          <span>Door PIN</span>
+          <input type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*"
+                 maxlength="8" name="pin" placeholder="4 digits" autofocus />
+        </label>
+        <button class="btn" type="submit">Open the door</button>
+        <p class="verdict" data-pinmsg></p>
+      </form>
+      <p class="fine">The PIN is on this stop’s report page. It opens this door and nothing else.</p>
+    </div>
+  ) : (
+  <div class="door" data-door>
   <header class="dhead">
     <div>
       <p class="eyebrow">Door · {showTime(event.starts_at)}</p>
@@ -33,6 +54,8 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     <div class="dhead__right">
       <span class="pill" data-net>·</span>
       <span class="pill" data-queue hidden>0 queued</span>
+      <input class="device" data-device placeholder="Name this phone" aria-label="This device’s name"
+             maxlength="20" autocomplete="off" />
     </div>
   </header>
 
@@ -122,12 +145,41 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     <button type="button" class="linkish" data-pull>Refresh list</button> ·
     <span data-pulled>never pulled</span>
   </p>
+  <p class="fine sync">Refreshes itself every half minute while online, so a seat scanned on another phone shows here.</p>
   </div>
+  )}
 </BoxOffice>
 
 <script>
   import jsQR from 'jsqr';
 
+  // ── the PIN gate ──────────────────────────────────────────────────────
+  const gate = document.querySelector<HTMLElement>('[data-gate]');
+  if (gate) {
+    const form = gate.querySelector<HTMLFormElement>('[data-pinform]')!;
+    const msg = gate.querySelector<HTMLElement>('[data-pinmsg]')!;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pin = (form.querySelector('input') as HTMLInputElement).value;
+      msg.textContent = '';
+      try {
+        const res = await fetch('/api/boxoffice/door/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ slug: gate.dataset.slug, pin }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (body.ok) { location.reload(); return; }
+        msg.textContent = body.error ?? 'That didn’t work.';
+        msg.dataset.kind = 'bad';
+      } catch {
+        msg.textContent = 'No connection. Try again when you have a bar.';
+        msg.dataset.kind = 'bad';
+      }
+    });
+  }
+
+if (document.querySelector('[data-door]')) {
   const slug = location.pathname.split('/').filter(Boolean).pop()!;
   // Non-generic on purpose: inside an Astro <script> the bare name `Element`
   // resolves to the JSX element type, so a `<T extends Element>` helper
@@ -227,10 +279,36 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     $('[data-sold]').textContent = String(live.length);
   }
 
+  // Which phone this is, so a report can say which door scanned a seat and
+  // a double scan can be traced. Kept on the device; typed once.
+  const deviceInput = $as<HTMLInputElement>('[data-device]');
+  deviceInput.value = localStorage.getItem('door-device') ?? '';
+  deviceInput.addEventListener('change', () => {
+    localStorage.setItem('door-device', deviceInput.value.trim().slice(0, 20));
+  });
+  const who = () => {
+    const op = $as<HTMLSelectElement>('[data-operator]')?.value ?? '';
+    const dev = deviceInput.value.trim();
+    return dev ? `${op} · ${dev}` : op;
+  };
+
   async function pull() {
     const res = await fetch(`/api/boxoffice/door/manifest?slug=${encodeURIComponent(slug)}`);
     if (!res.ok) throw new Error('manifest');
     const m = (await res.json()) as Manifest & { ok: boolean };
+    // A check-in still waiting in the queue is a fact the server does not
+    // have yet. Carry it over, or the next scan of that code says "in"
+    // twice and the count drops by one until the queue drains.
+    const pending = new Set(
+      (await all<{ type: string; code?: string }>('queue'))
+        .filter((e) => e.type === 'checkin' && e.code)
+        .map((e) => e.code!)
+    );
+    for (const t of m.tickets) {
+      if (pending.has(t.code) && !t.checked_in_at) {
+        t.checked_in_at = manifest?.tickets.find((x) => x.code === t.code)?.checked_in_at ?? new Date().toISOString();
+      }
+    }
     manifest = m;
     await put('kv', m, 'manifest');
     paintCounts();
@@ -306,10 +384,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     const at = new Date().toISOString();
     t.checked_in_at = at;
     await put('kv', manifest, 'manifest');
-    await put('queue', {
-      type: 'checkin', id: uuid(), code, at,
-      by: $as<HTMLSelectElement>('[data-operator]')?.value,
-    });
+    await put('queue', { type: 'checkin', id: uuid(), code, at, by: who() });
     paintCounts();
     await paintQueue();
     say(v, 'ok', `${t.label ?? 'Admit'} — in`);
@@ -392,7 +467,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         return `<div class="row">
           <div>
             <div class="row__name">${esc(o.buyer_name ?? '(no name)')}</div>
-            <div class="row__sub">${esc(o.buyer_email ?? '')} · ${tickets.length} seat${tickets.length === 1 ? '' : 's'}${o.channel !== 'web' ? ' · door' : ''}</div>
+            <div class="row__sub">${esc(o.buyer_email ?? '')} · ${tickets.length} seat${tickets.length === 1 ? '' : 's'}${label(o.channel)}</div>
           </div>
           <button type="button" class="row__go" data-admit="${o.id}"
             ${inCount >= tickets.length ? 'disabled' : ''}>
@@ -404,6 +479,8 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
   }
   const esc = (s: string) =>
     s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const label = (channel: string) =>
+    channel === 'comp' ? ' · comp' : channel === 'invoice' ? ' · group' : channel.startsWith('door') ? ' · door' : '';
 
   $('[data-rows]').addEventListener('click', async (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-admit]');
@@ -513,7 +590,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
       type: 'cash', id, basket: lines, codes,
       buyer_name: name || null,
       at: new Date().toISOString(),
-      by: $as<HTMLSelectElement>('[data-operator]').value,
+      by: who(),
     });
 
     // Reflected locally at once so the counts and will-call are right even if
@@ -604,11 +681,23 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
       $('[data-pulled]').textContent = `cached ${new Date(cached.pulled_at).toLocaleTimeString()}`;
     }
     if (navigator.onLine) {
-      try { await pull(); } catch { /* the cache stands */ }
+      // Queue first, then the list: a cash sale made offline has tickets the
+      // server has not seen, and pulling before pushing would hide them.
       await sync();
+      try { await pull(); } catch { /* the cache stands */ }
     }
     paintSell();
   })();
+
+  // Other phones exist. Every half minute while online: push what we have,
+  // then — only with nothing left to push — take the server's picture.
+  setInterval(async () => {
+    if (!navigator.onLine) return;
+    await sync();
+    const q = await all('queue');
+    if (!q.length) { try { await pull(); } catch { /* next time */ } }
+  }, 30_000);
+}
 </script>
 
 <style>
@@ -625,6 +714,13 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
   }
   .pill--ok { color: var(--ok); border-color: #3f5c38; }
   .pill--off { color: #e0b36a; border-color: #8a6a28; }
+  .device {
+    width: 9rem; font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+    text-align: right; padding: .3rem .5rem; margin-top: .2rem;
+  }
+  .gate { max-width: 24rem; margin: 2rem auto; }
+  .pinform { margin-top: 1.5rem; }
+  .pinform input { font-family: var(--mono); font-size: 1.6rem; letter-spacing: .3em; text-align: center; }
 
   .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 1rem 0; }
   .count {

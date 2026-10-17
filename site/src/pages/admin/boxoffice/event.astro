@@ -49,6 +49,13 @@ const error = Astro.url.searchParams.get('error');
                placeholder="2027-03-12T18:45:00-06:00" /></label>
       <label><span class="label">Capacity</span>
         <input name="capacity" type="number" min="0" required value={String(event?.capacity ?? '')} /></label>
+      <label><span class="label">Seats held off the web</span>
+        <input name="holds" type="number" min="0" value={String(event?.holds ?? 0)} />
+        <span class="hint">Clergy, press, the crew’s family. The door can still sell them.</span></label>
+      <label><span class="label">Door PIN</span>
+        <input name="door_pin" inputmode="numeric" maxlength="8" value={event?.door_pin ?? ''}
+               placeholder="blank = make one" />
+        <span class="hint">Four digits that open this stop’s door and nothing else.</span></label>
       <label><span class="label">Rental for the house</span>
         <input name="rental" value={event ? (event.rental_cents / 100).toFixed(2) : ''}
                placeholder="1850.00" />

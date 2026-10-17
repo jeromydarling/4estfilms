@@ -63,6 +63,8 @@ export interface CheckoutSession {
   customer_details?: { email?: string; name?: string };
   customer_email?: string;
   metadata?: Record<string, string>;
+  /** Tax and discount, broken out of amount_total. */
+  total_details?: { amount_tax?: number; amount_discount?: number };
   /** Checkout's own custom fields — this is where the will-call name lands. */
   custom_fields?: { key?: string; text?: { value?: string } }[];
 }

@@ -2,8 +2,11 @@
 import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
 import { getEvent } from '../../../lib/boxoffice-db';
-import { offeringsAt, salesByCode, soldBySku, stopTotals } from '../../../lib/boxoffice-report';
+import {
+  invoicesAt, offeringsAt, salesByCode, settlementsAt, soldBySku, stopTotals, waitlistAt,
+} from '../../../lib/boxoffice-report';
 import { TOUR, money, showTime } from '../../../lib/boxoffice';
+import { SITE } from '../../../lib/email';
 import { env } from 'cloudflare:workers';
 
 export const prerender = false;
@@ -15,10 +18,13 @@ const event = await getEvent(slug);
 if (!event) return Astro.redirect('/admin/boxoffice/');
 
 const [totals] = await stopTotals(event.id);
-const [items, codes, gifts, orders] = await Promise.all([
+const [items, codes, gifts, invoices, payments, waitlist, orders] = await Promise.all([
   soldBySku(event.id),
   salesByCode(event.id),
   offeringsAt(event.id),
+  invoicesAt(event.id),
+  settlementsAt(event.id),
+  waitlistAt(event.id),
   env.DB
     .prepare(
       `SELECT o.id, o.buyer_name, o.buyer_email, o.channel, o.status, o.total_cents,
@@ -35,6 +41,36 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
 // bucket and one poster, and the table should say so rather than implying
 // four of everything.
 const merch = items.filter((i) => i.admits === 0);
+
+const q = Astro.url.searchParams;
+const flash = [
+  q.get('comp') === 'done' && 'Comps issued.',
+  q.get('comp') === 'noemail' && 'Comps issued, but the email failed — send the codes by hand.',
+  q.get('comp') === 'name' && 'A comp needs a name for will-call.',
+  q.get('invoice') === 'created' && 'Invoice created; the seats are held.',
+  q.get('invoice') === 'paid' && 'Invoice paid; tickets minted and sent.',
+  q.get('invoice') === 'noemail' && 'Invoice paid and tickets minted, but the email failed.',
+  q.get('invoice') === 'cancelled' && 'Invoice cancelled; the seats are released.',
+  q.get('invoice') === 'state' && 'That invoice isn’t open.',
+  q.get('invoice') === 'name' && 'An invoice needs a name.',
+  q.get('settled') === 'done' && 'Payment recorded.',
+  q.get('settled') === 'removed' && 'Payment removed.',
+  q.get('settled') === 'bad' && 'A payment needs a kind and an amount.',
+  q.get('sent') && q.get('sent') !== 'empty' && `Sent to ${q.get('sent')} ${q.get('audience') === 'waitlist' ? 'on the waitlist' : 'ticket holders'}.`,
+  q.get('sent') === 'empty' && 'A message needs a subject and some words.',
+  q.get('refund') === 'done' && 'Refunded; tickets voided and stock returned.',
+  q.get('refund') === 'already' && 'That order was already refunded.',
+  q.get('refund') === 'failed' && 'Stripe refused the refund — nothing changed.',
+  q.get('refund') === 'nokey' && 'No Stripe key, so nothing was refunded.',
+].filter(Boolean) as string[];
+
+const postShow =
+  `Thank you for coming to His Name is Michael at ${event.venue}.\n\n` +
+  `If the night moved you, a free-will offering — any amount — goes to the parish that opened its doors, ` +
+  `and the making-of documentary and the songs from the film come with it.\n\n` +
+  `Tell someone in the next town.`;
+const unpaidInvoices = invoices.filter((i) => i.status === 'unpaid');
+const openWaitlist = waitlist.filter((w) => !w.notified_at);
 ---
 
 <Admin title={`Report — ${event.venue}`}>
@@ -48,7 +84,40 @@ const merch = items.filter((i) => i.admits === 0);
     <a class="lnk" href={`/api/admin/boxoffice/export?what=orders&slug=${event.slug}`}>Orders CSV</a>
     <a class="lnk" href={`/boxoffice/give/${event.slug}/sign/`} target="_blank" rel="noopener">Offering sign (print)</a>
     <a class="lnk" href={`/boxoffice/give/${event.slug}/`} target="_blank" rel="noopener">Offering page</a>
+    <a class="lnk" href={`/admin/boxoffice/statement/?slug=${event.slug}`} target="_blank" rel="noopener">Settlement statement (print)</a>
+    <a class="lnk" href={`/api/admin/boxoffice/export?what=waitlist&slug=${event.slug}`}>Waitlist CSV</a>
   </p>
+
+  {flash.map((f) => <p class="flash">{f}</p>)}
+
+  <h2>Door and host</h2>
+  <div class="keys">
+    <div class="key">
+      <p class="label">Door PIN</p>
+      <p class="key__big num">{event.door_pin ?? '—'}</p>
+      <p class="muted small">Opens <span class="num">{SITE}/boxoffice/door/{event.slug}/</span> and nothing else. Give it to whoever runs the door.</p>
+      <form method="post" action="/api/admin/boxoffice/event" class="inline">
+        <input type="hidden" name="action" value="door_pin" />
+        <input type="hidden" name="slug" value={event.slug} />
+        <button type="submit" class="quiet">New PIN</button>
+      </form>
+    </div>
+    <div class="key">
+      <p class="label">Host’s page</p>
+      <p class="muted small">
+        Read-only for the parish coordinator: seats sold, their codes, what they’re owed. No names.
+      </p>
+      {event.host_token
+        ? <p class="num small"><a href={`/boxoffice/host/${event.host_token}/`} target="_blank" rel="noopener">{SITE}/boxoffice/host/{event.host_token}/</a></p>
+        : <p class="muted small">None yet — save the stop once.</p>}
+      <form method="post" action="/api/admin/boxoffice/event" class="inline"
+            onsubmit="return confirm('The old link will stop working. Continue?')">
+        <input type="hidden" name="action" value="host_token" />
+        <input type="hidden" name="slug" value={event.slug} />
+        <button type="submit" class="quiet">New link</button>
+      </form>
+    </div>
+  </div>
 
   <h2>The money</h2>
   <div class="scroll">
@@ -76,6 +145,12 @@ const merch = items.filter((i) => i.admits === 0);
         <tr class="rule"><td><strong>To the parish</strong>
               <span class="muted">(tithe + offerings, passed on whole)</span></td>
             <td class="right num"><strong>{money(totals.parish_cents)}</strong></td></tr>
+        <tr><td>Paid to the parish so far</td>
+            <td class="right num">−{money(totals.tithe_paid_cents + totals.offering_paid_cents)}</td></tr>
+        <tr><td><strong>{totals.parish_due_cents < 0 ? 'Overpaid' : 'Still due to the parish'}</strong></td>
+            <td class={`right num ${totals.parish_due_cents > 0 ? 'bad' : ''}`}><strong>{money(Math.abs(totals.parish_due_cents))}</strong></td></tr>
+        <tr class="rule"><td>Sales tax collected <span class="muted">(remitted by us; in none of the figures above)</span></td>
+            <td class="right num">{money(totals.tax_cents)}</td></tr>
       </tbody>
     </table>
   </div>
@@ -95,7 +170,9 @@ const merch = items.filter((i) => i.admits === 0);
   <div class="scroll">
     <table>
       <tbody>
-        <tr><td>Seats sold</td><td class="right num">{totals.attendees} of {totals.capacity}</td></tr>
+        <tr><td>Seats sold <span class="muted">(including {totals.comp_seats} comps)</span></td><td class="right num">{totals.attendees} of {totals.capacity}</td></tr>
+        <tr><td>Held off the web <span class="muted">(the door can still sell them)</span></td><td class="right num">{event.holds ?? 0}</td></tr>
+        <tr><td>Held by unpaid group invoices</td><td class="right num">{totals.reserved_admits}</td></tr>
         <tr><td>Checked in at the door</td><td class="right num">{totals.checked_in}</td></tr>
         <tr><td>No-shows</td><td class="right num">{totals.attendees - totals.checked_in}</td></tr>
         <tr><td>Orders <span class="muted">({totals.door_orders} taken at the door)</span></td>
@@ -157,6 +234,135 @@ const merch = items.filter((i) => i.admits === 0);
           : <tr><td colspan="5" class="empty">No code has been used at this stop.</td></tr>}
       </tbody>
     </table>
+  </div>
+
+  <h2>Settling up</h2>
+  <p class="muted small">What has gone out: the tithe cheque, the offering handed over, the rental paid to the house.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Paid</th><th>What</th><th>How</th><th class="right">Amount</th><th></th></tr></thead>
+      <tbody>
+        {payments.length ? payments.map((p) => (
+          <tr>
+            <td class="num">{p.paid_at}</td>
+            <td>{p.kind}{p.note ? <span class="muted"> — {p.note}</span> : null}</td>
+            <td>{p.method ?? '—'}</td>
+            <td class="right num">{money(p.amount_cents)}</td>
+            <td class="right">
+              <form method="post" action="/api/admin/boxoffice/settle" onsubmit="return confirm('Remove this payment record?')">
+                <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="slug" value={event.slug} />
+                <input type="hidden" name="id" value={String(p.id)} />
+                <button class="refund" type="submit">Remove</button>
+              </form>
+            </td>
+          </tr>
+        )) : <tr><td colspan="5" class="empty">Nothing paid out yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+  <form class="row" method="post" action="/api/admin/boxoffice/settle">
+    <input type="hidden" name="slug" value={event.slug} />
+    <label><span class="label">What</span>
+      <select name="kind">
+        <option value="tithe">Tithe to the parish</option>
+        <option value="offering">Offering to the parish</option>
+        <option value="rental">Rental to the house</option>
+      </select></label>
+    <label><span class="label">Amount</span><input name="amount" inputmode="decimal" placeholder="0.00" required /></label>
+    <label><span class="label">Date</span><input name="paid_at" type="date" /></label>
+    <label><span class="label">How</span><input name="method" placeholder="cheque #1042" /></label>
+    <label class="grow"><span class="label">Note</span><input name="note" /></label>
+    <button type="submit">Record payment</button>
+  </form>
+
+  <h2>Comps</h2>
+  <p class="muted small">Seats given away: the pastor, the press, the family who fed the crew. Real tickets at $0.</p>
+  <form class="row" method="post" action="/api/admin/boxoffice/comp">
+    <input type="hidden" name="slug" value={event.slug} />
+    <label><span class="label">Seats</span><input name="seats" type="number" min="1" max="100" value="2" required /></label>
+    <label><span class="label">Name (for will-call)</span><input name="name" required /></label>
+    <label><span class="label">Email (sends the tickets)</span><input name="email" type="email" /></label>
+    <label class="grow"><span class="label">Why</span><input name="note" placeholder="pastor and family" /></label>
+    <button type="submit">Issue comps</button>
+  </form>
+
+  <h2>Group invoices</h2>
+  <p class="muted small">
+    Forty seats for a parish, paid by cheque. The seats are held the moment the invoice exists;
+    the tickets are minted and sent the moment it’s marked paid.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Created</th><th>Who</th><th class="right">Seats</th><th class="right">Amount</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {invoices.length ? invoices.map((i) => (
+          <tr class={i.status === 'cancelled' ? 'off' : ''}>
+            <td class="num">{i.created_at.slice(0, 10)}</td>
+            <td>{i.buyer_name}<br /><span class="muted">{i.buyer_email ?? ''}{i.note ? ` · ${i.note}` : ''}</span></td>
+            <td class="right num">{i.status === 'unpaid' ? i.reserved_admits : i.seats}</td>
+            <td class="right num">{money(i.total_cents)}</td>
+            <td>{i.status}{i.reference ? <span class="muted"> · {i.reference}</span> : null}</td>
+            <td class="right">
+              {i.status === 'unpaid' && (
+                <>
+                  <form method="post" action="/api/admin/boxoffice/invoice" class="inline">
+                    <input type="hidden" name="action" value="paid" />
+                    <input type="hidden" name="slug" value={event.slug} />
+                    <input type="hidden" name="order_id" value={String(i.id)} />
+                    <input name="reference" placeholder="cheque #" class="tiny" />
+                    <button class="refund" type="submit">Mark paid</button>
+                  </form>
+                  <form method="post" action="/api/admin/boxoffice/invoice" class="inline"
+                        onsubmit="return confirm('Cancel this invoice and release its seats?')">
+                    <input type="hidden" name="action" value="cancel" />
+                    <input type="hidden" name="slug" value={event.slug} />
+                    <input type="hidden" name="order_id" value={String(i.id)} />
+                    <button class="refund" type="submit">Cancel</button>
+                  </form>
+                </>
+              )}
+            </td>
+          </tr>
+        )) : <tr><td colspan="6" class="empty">No group invoices.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+  <form class="row" method="post" action="/api/admin/boxoffice/invoice">
+    <input type="hidden" name="slug" value={event.slug} />
+    <input type="hidden" name="action" value="create" />
+    <label><span class="label">Seats</span><input name="seats" type="number" min="1" max="2000" value="20" required /></label>
+    <label><span class="label">Group</span><input name="name" placeholder="St Mary’s, Yankton" required /></label>
+    <label><span class="label">Email (gets the tickets)</span><input name="email" type="email" /></label>
+    <label><span class="label">Rate each</span><input name="rate" inputmode="decimal" placeholder="stop price" /></label>
+    <label class="grow"><span class="label">Note</span><input name="note" /></label>
+    <button type="submit">Create invoice</button>
+  </form>
+  {!!unpaidInvoices.length && (
+    <p class="muted small">{unpaidInvoices.reduce((n, i) => n + i.reserved_admits, 0)} seats held by {unpaidInvoices.length} open {unpaidInvoices.length === 1 ? 'invoice' : 'invoices'}.</p>
+  )}
+
+  <h2>Write to this stop</h2>
+  <div class="two">
+    <form class="msg" method="post" action="/api/admin/boxoffice/notify">
+      <input type="hidden" name="slug" value={event.slug} />
+      <input type="hidden" name="audience" value="buyers" />
+      <p class="label">The morning after — to everyone with a seat</p>
+      <input name="subject" value={`Thank you for coming — ${event.venue}`} required />
+      <textarea name="message" rows="6">{postShow}</textarea>
+      <p class="muted small">Ends with a button to the offering page. Sends to each address once.</p>
+      <button type="submit" onclick="return confirm('Send to every ticket holder at this stop?')">Send to ticket holders</button>
+    </form>
+    <form class="msg" method="post" action="/api/admin/boxoffice/notify">
+      <input type="hidden" name="slug" value={event.slug} />
+      <input type="hidden" name="audience" value="waitlist" />
+      <p class="label">A second showing — to the waitlist ({openWaitlist.length} waiting{waitlist.length - openWaitlist.length ? `, ${waitlist.length - openWaitlist.length} already told` : ''})</p>
+      <input name="subject" value={`Seats opened at ${event.venue}`} required />
+      <textarea name="message" rows="6">{`You asked to hear if seats opened at ${event.venue}. They have — the link below takes you straight to them.`}</textarea>
+      <p class="muted small">Ends with a button to the ticket page. Each person is written to once.</p>
+      <button type="submit" disabled={!openWaitlist.length}
+              onclick="return confirm('Send to everyone on the waitlist?')">Send to the waitlist</button>
+    </form>
   </div>
 
   <h2>Card offerings</h2>
@@ -239,4 +445,31 @@ const merch = items.filter((i) => i.admits === 0);
     background: var(--blood); border: 0; border-radius: 3px; color: #fff;
     font: inherit; font-weight: 600; padding: .55rem 1rem; cursor: pointer;
   }
+  .flash { border-left: 3px solid var(--blood); padding: .5rem .8rem; background: var(--ink-2); margin: 0 0 1rem; }
+  .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .key { border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.2rem; }
+  .key__big { font-size: 2.2rem; letter-spacing: .2em; margin: .2rem 0 .4rem; }
+  .key .small a { word-break: break-all; }
+  .inline { display: inline-flex; gap: .4rem; align-items: center; margin: .4rem .4rem 0 0; }
+  .quiet {
+    background: none; border: 1px solid var(--rule); color: var(--dim); font: inherit; font-size: .78rem;
+    padding: .3rem .6rem; border-radius: 3px; cursor: pointer;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: .7rem; align-items: flex-end; margin: .8rem 0 1.6rem; }
+  .row label { display: block; }
+  .row .grow { flex: 1 1 12rem; }
+  .row input, .row select, .msg input, .msg textarea, .tiny {
+    background: var(--ink-2); border: 1px solid var(--rule); border-radius: 3px;
+    color: var(--bone); font: inherit; padding: .5rem .7rem; width: 100%; box-sizing: border-box;
+  }
+  .row input { width: 11rem; }
+  .row .grow input { width: 100%; }
+  .row button, .msg button {
+    background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+    font: inherit; font-weight: 600; padding: .55rem 1rem; cursor: pointer;
+  }
+  .msg button:disabled { opacity: .45; cursor: default; }
+  .tiny { width: 7rem; font-size: .78rem; padding: .3rem .5rem; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; margin-bottom: 1.6rem; }
+  .msg { border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.2rem; display: grid; gap: .6rem; }
 </style>

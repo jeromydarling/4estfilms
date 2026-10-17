@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { isAdmin } from '../../../../lib/admin';
+import { canDoor } from '../../../../lib/door';
 import { getEvent, quote } from '../../../../lib/boxoffice-db';
 import { stripeKey, type BasketLine } from '../../../../lib/boxoffice';
 
@@ -23,8 +23,6 @@ const json = (b: unknown, status = 200) =>
   });
 
 export const POST: APIRoute = async ({ request, url }) => {
-  if (!(await isAdmin(request, url))) return json({ ok: false }, 404);
-
   let body: { slug?: string; basket?: BasketLine[]; operator?: string };
   try {
     body = (await request.json()) as typeof body;
@@ -34,8 +32,9 @@ export const POST: APIRoute = async ({ request, url }) => {
 
   const event = await getEvent(String(body.slug ?? ''));
   if (!event) return json({ ok: false, error: 'No such stop.' }, 404);
+  if (!(await canDoor(request, url, event.id))) return json({ ok: false }, 404);
 
-  const q = await quote(event, Array.isArray(body.basket) ? body.basket : [], null);
+  const q = await quote(event, Array.isArray(body.basket) ? body.basket : [], null, { door: true });
   if (!q.ok) return json({ ok: false, error: q.error }, 422);
 
   const { key, error: keyError } = stripeKey();

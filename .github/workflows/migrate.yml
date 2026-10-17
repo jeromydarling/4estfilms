@@ -181,6 +181,39 @@ jobs:
             d1 execute 4estfilms-db --${{ inputs.target }}
             --file migrations/0012_boxoffice_offerings.sql
 
+      - name: Apply 0013 — door PINs, host links, holds
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0013_boxoffice_events_v2.sql
+
+      - name: Apply 0014 — tax, invoices, comps on orders
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0014_boxoffice_orders_v2.sql
+
+      - name: Apply 0015 — settlements and waitlists
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0015_boxoffice_settlements.sql
+
       - name: Confirm schema
         uses: cloudflare/wrangler-action@v3
         with:
