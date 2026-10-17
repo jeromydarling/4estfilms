@@ -1,8 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
-import { stopTotals } from '../../../lib/boxoffice-report';
-import { stock } from '../../../lib/boxoffice-report';
+import { offeringsAt, stock, stopTotals } from '../../../lib/boxoffice-report';
 import { TOUR, money, showTime } from '../../../lib/boxoffice';
 
 export const prerender = false;
@@ -11,6 +10,10 @@ if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
 
 const stops = await stopTotals();
 const lowStock = (await stock()).filter((s) => s.low);
+// Gifts made to the tour rather than at a stop: no parish to settle with,
+// so they sit outside every row and would otherwise never be seen.
+const tourGifts = await offeringsAt(null);
+const tourGiftCents = tourGifts.reduce((n, g) => n + g.amount_cents - g.refunded_cents - g.fee_cents, 0);
 
 const legs = [...new Set(stops.map((s) => s.leg ?? 'Unassigned'))];
 const sum = (f: (s: (typeof stops)[number]) => number) => stops.reduce((n, s) => n + f(s), 0);
@@ -22,7 +25,8 @@ const tour = {
   rental: sum((s) => s.rental_cents),
   net: sum((s) => s.net_cents),
   tithe: sum((s) => s.tithe_cents),
-  offering: sum((s) => s.offering_cents),
+  offering: sum((s) => s.offering_passed_cents),
+  parish: sum((s) => s.parish_cents),
   attendees: sum((s) => s.attendees),
   checkedIn: sum((s) => s.checked_in),
   capacity: sum((s) => s.capacity),
@@ -54,7 +58,7 @@ const perHead = tour.attendees
     <div class="tile">
       <p class="label">Tithe at {TOUR.tithePercent}%</p>
       <p class="tile__n num">{money(tour.tithe)}</p>
-      <p class="tile__note">{money(tour.offering)} offerings collected</p>
+      <p class="tile__note">{money(tour.offering)} in offerings · {money(tour.parish)} owed to parishes</p>
     </div>
     <div class="tile">
       <p class="label">Attendees</p>
@@ -73,12 +77,22 @@ const perHead = tour.attendees
     </p>
   )}
 
+  {!!tourGifts.length && (
+    <p class="warn">
+      {tourGifts.length} {tourGifts.length === 1 ? 'gift' : 'gifts'} to the tour as a whole,
+      {money(tourGiftCents)} after fees — made through <a href="/boxoffice/give/">/boxoffice/give/</a>,
+      not at any stop.
+    </p>
+  )}
+
   <p class="acts">
     <a class="btn" href="/admin/boxoffice/event/">New stop</a>
+    <a class="lnk" href="/boxoffice/give/tour/sign/" target="_blank" rel="noopener">Tour offering sign</a>
     <a class="lnk" href="/admin/boxoffice/codes/">Promo codes</a>
     <a class="lnk" href="/admin/boxoffice/inventory/">Inventory</a>
     <a class="lnk" href="/boxoffice/door/">Door mode</a>
     <a class="lnk" href="/api/admin/boxoffice/export?what=tour">Tour CSV</a>
+    <a class="lnk" href="/api/admin/boxoffice/export?what=offerings">Offerings CSV</a>
   </p>
 
   {legs.map((leg) => {

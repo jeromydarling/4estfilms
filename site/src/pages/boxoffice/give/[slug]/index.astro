@@ -1,0 +1,44 @@
+---
+import BoxOffice from '../../../../layouts/BoxOffice.astro';
+import OfferingForm from '../../../../components/OfferingForm.astro';
+import { getEvent } from '../../../../lib/boxoffice-db';
+import { showTime } from '../../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * The page the offering QR opens: this stop, this parish, give what you like.
+ *
+ * Reachable for any announced stop, before and after the night — somebody
+ * who photographs the sign on the way out should still be able to give from
+ * the car.
+ */
+const event = await getEvent(String(Astro.params.slug ?? ''));
+if (!event || event.status === 'draft') return new Response('Not found', { status: 404 });
+
+const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+---
+
+<BoxOffice
+  title={`Free-will offering — ${event.venue}, ${city}`}
+  description={`Make a free-will offering at ${event.venue}. Any amount; the making-of and the songs come with it.`}
+>
+  <p class="eyebrow">Free-will offering</p>
+  <h1>{event.venue}</h1>
+  <p class="where dim">{city} · {showTime(event.starts_at)}</p>
+
+  <p class="lead">
+    Give what you’d like. Offerings made here go to the parish that opened its
+    doors for the night — in full, less only what the card processor takes.
+  </p>
+
+  <OfferingForm slug={event.slug} />
+
+  <p class="fine back"><a href={`/boxoffice/${event.slug}/`}>Tickets for this stop</a></p>
+</BoxOffice>
+
+<style>
+  .where { margin: 0 0 1.2rem; font-size: 1.05rem; }
+  .lead { font-size: 1.08rem; margin: 0 0 .4rem; }
+  .back { margin-top: 2rem; }
+</style>

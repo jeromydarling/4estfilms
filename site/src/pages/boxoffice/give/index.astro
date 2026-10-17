@@ -1,0 +1,37 @@
+---
+import BoxOffice from '../../../layouts/BoxOffice.astro';
+import OfferingForm from '../../../components/OfferingForm.astro';
+
+export const prerender = false;
+
+/**
+ * A gift to the tour as a whole, for anyone who did not scan a sign at a
+ * particular stop. Attributed to no parish; it carries the film.
+ */
+---
+
+<BoxOffice
+  title="Free-will offering — His Name is Michael, the 2027 tour"
+  description="Give what you’d like toward carrying His Name is Michael town to town. The making-of and the songs come with it."
+>
+  <p class="eyebrow">Free-will offering</p>
+  <h1>Carry it to the next town.</h1>
+
+  <p class="lead">
+    A hundred rooms, most of them borrowed. A gift to the tour pays for the
+    projector, the drive and the night’s rental in a town that hasn’t seen the
+    film yet.
+  </p>
+
+  <OfferingForm slug={null} />
+
+  <p class="fine back">
+    Giving after a screening? Use the code on the sign — it sends your gift
+    to that parish.
+  </p>
+</BoxOffice>
+
+<style>
+  .lead { font-size: 1.08rem; margin: 0 0 .4rem; }
+  .back { margin-top: 2rem; }
+</style>

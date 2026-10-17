@@ -63,8 +63,28 @@ pays on their own phone. Cash is the offline path.
 transaction rather than estimated from 2.9% + 30¢, because the published rate
 is not what lands and a tithe computed from a rate card is wrong at every stop.
 Net is gross less refunds, fees and the house; the tithe is 10% of net, and nil
-when a stop does not clear. The free-will offering is entered by hand after the
-show and passed on whole, so it is reported but never counted as retained.
+when a stop does not clear. The free-will offering is passed on whole, so it is
+reported but never counted as retained.
+
+**The free-will offering.** Two halves. The cash in the basket is counted by
+hand and typed into the stop's report. The card half comes through a QR on a
+printed sign — `/boxoffice/give/<stop>/sign/` from the report page, or
+`/boxoffice/give/tour/sign/` for the tour as a whole — which opens
+`/boxoffice/give/<stop>/`: four amounts or your own, Stripe Checkout with the
+"Donate" wording, attributed to that stop so the parish's settlement shows what
+their own people gave. The report shows cash, card less Stripe's fee, and one
+line for what the parish is owed (tithe plus offering).
+
+Every card gift is answered with a link to `/boxoffice/gift/<token>/`: the
+making-of documentary and the songs from the film. **The gift is whatever is in
+the R2 bucket under `private/gift/`** — upload `01-making-of.mp4` and
+`02-the-lantern-song.mp3` and they appear, titled from the filename, for
+everyone who has ever given. The public `/media/` route refuses `private/`, so
+nothing under that prefix can be reached without a token.
+
+```
+wrangler r2 object put 4estfilms-media/private/gift/01-making-of.mp4 --file making-of.mp4
+```
 
 **Test first.** The box office refuses an `sk_live_` key unless `BOXOFFICE_LIVE`
 is explicitly `true`, so a rehearsal cannot charge a real card.

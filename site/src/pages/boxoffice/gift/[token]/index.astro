@@ -1,0 +1,120 @@
+---
+import BoxOffice from '../../../../layouts/BoxOffice.astro';
+import { env } from 'cloudflare:workers';
+import { giftItems } from '../../../../lib/offering';
+import { money } from '../../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * The gift: the making-of, and the songs.
+ *
+ * Holding the token is the proof, the same way holding a ticket code is.
+ * Nothing on this page is listed by configuration — it is whatever has been
+ * uploaded under the gift prefix, so a new song appears for everybody who
+ * has ever given, the moment it lands in the bucket.
+ */
+const token = String(Astro.params.token ?? '').toLowerCase();
+const gift = /^[0-9a-f]{32}$/.test(token) && env.DB
+  ? await env.DB
+      .prepare(
+        `SELECT g.amount_cents, g.giver_name, g.created_at, e.venue, e.city, e.region
+           FROM bo_offerings g LEFT JOIN bo_events e ON e.id = g.event_id
+          WHERE g.gift_token = ?1`
+      )
+      .bind(token)
+      .first<{ amount_cents: number; giver_name: string | null; created_at: string;
+               venue: string | null; city: string | null; region: string | null }>()
+  : null;
+
+if (!gift) Astro.response.status = 404;
+
+const items = gift ? await giftItems() : [];
+const videos = items.filter((i) => i.kind === 'video');
+const songs = items.filter((i) => i.kind === 'audio');
+const others = items.filter((i) => i.kind === 'other');
+const base = `/boxoffice/gift/${token}/`;
+const mb = (n: number) => `${(n / 1_048_576).toFixed(n < 10_485_760 ? 1 : 0)} MB`;
+---
+
+<BoxOffice title={gift ? 'Your gift — His Name is Michael' : 'Gift not found'} bare wide>
+  {gift ? (
+    <div class="gift">
+      <p class="eyebrow">With our thanks</p>
+      <h1>{gift.giver_name ? `For ${gift.giver_name.split(' ')[0]}.` : 'For you.'}</h1>
+      <p class="dim">
+        A gift of {money(gift.amount_cents)}{gift.venue ? ` at ${gift.venue}, ${gift.city}${gift.region ? `, ${gift.region}` : ''}` : ' to the tour'}.
+        This page is yours; keep the link.
+      </p>
+
+      {!items.length && (
+        <p class="note">
+          We’re still cutting the documentary and mastering the songs. They
+          will appear here as they’re finished — nothing to do but keep this link.
+        </p>
+      )}
+
+      {!!videos.length && (
+        <section>
+          <h2>Watch</h2>
+          {videos.map((v) => (
+            <figure class="item">
+              <figcaption>{v.title} <span class="fine">· {mb(v.size)}</span></figcaption>
+              <video controls preload="metadata" playsinline src={base + v.key}></video>
+              <p class="fine"><a href={`${base}${v.key}?download=1`}>Download</a></p>
+            </figure>
+          ))}
+        </section>
+      )}
+
+      {!!songs.length && (
+        <section>
+          <h2>Listen</h2>
+          {songs.map((s) => (
+            <figure class="item item--song">
+              <figcaption>{s.title}</figcaption>
+              <audio controls preload="none" src={base + s.key}></audio>
+              <p class="fine"><a href={`${base}${s.key}?download=1`}>Download MP3 · {mb(s.size)}</a></p>
+            </figure>
+          ))}
+        </section>
+      )}
+
+      {!!others.length && (
+        <section>
+          <h2>Also</h2>
+          <ul class="plain">
+            {others.map((o) => (
+              <li><a href={`${base}${o.key}?download=1`}>{o.title}</a> <span class="fine">· {mb(o.size)}</span></li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <p class="fine foot">4est Films · <a href="/boxoffice/">The 2027 tour</a></p>
+    </div>
+  ) : (
+    <div class="gift">
+      <h1>We can’t find that gift.</h1>
+      <p class="dim">
+        Check the link in your email — it should end in 32 letters and
+        numbers. If it still won’t open, write to
+        <a href="mailto:hello@4estfilms.studio">hello@4estfilms.studio</a> and
+        we’ll find you.
+      </p>
+    </div>
+  )}
+</BoxOffice>
+
+<style>
+  .gift { padding-top: .5rem; }
+  section { margin-top: 2.2rem; }
+  .item { margin: 0 0 1.6rem; }
+  .item figcaption { font-family: var(--display); font-size: 1.15rem; margin-bottom: .5rem; }
+  video { display: block; width: 100%; border-radius: 4px; background: #000; }
+  audio { display: block; width: 100%; }
+  .item .fine { margin: .4rem 0 0; }
+  .plain { list-style: none; padding: 0; margin: 0; }
+  .plain li { padding: .5rem 0; border-bottom: 1px solid var(--rule); }
+  .foot { margin-top: 3rem; }
+</style>
