@@ -1,0 +1,122 @@
+---
+import { OFFERING, money } from '../lib/boxoffice';
+
+/**
+ * The giving form: four amounts, or your own.
+ *
+ * Shared by the per-stop page and the tour-wide one; the only difference
+ * between them is the slug the server attributes the gift to.
+ */
+interface Props {
+  slug: string | null;
+}
+const { slug } = Astro.props;
+const min = OFFERING.minCents / 100;
+---
+
+<form class="give" data-give data-slug={slug ?? ''}>
+  <div class="amounts" role="group" aria-label="Amount">
+    {OFFERING.presets.map((c) => (
+      <button type="button" class="amount" data-amount={c}>{money(c).replace(/\.00$/, '')}</button>
+    ))}
+  </div>
+
+  <label class="field other">
+    <span>Or another amount</span>
+    <span class="other__wrap">
+      <span class="other__sign" aria-hidden="true">$</span>
+      <input type="text" inputmode="decimal" autocomplete="off" data-other
+             placeholder="Whatever you’d like" aria-label="Amount in dollars" />
+    </span>
+  </label>
+
+  <button class="btn" type="submit" data-go disabled>Choose an amount</button>
+  <p class="give__msg" role="status" aria-live="polite" data-msg></p>
+  <p class="fine">
+    Card, Apple Pay or Google Pay, handled by Stripe. As our thanks, the
+    making-of documentary and the songs from the film come to your inbox.
+    Gifts of at least ${min}.
+  </p>
+</form>
+
+<script>
+  const giveForm = document.querySelector<HTMLFormElement>('[data-give]');
+  if (giveForm) {
+    const form = giveForm;
+    const slug = form.dataset.slug || null;
+    const presets = [...form.querySelectorAll<HTMLButtonElement>('[data-amount]')];
+    const other = form.querySelector<HTMLInputElement>('[data-other]')!;
+    const go = form.querySelector<HTMLButtonElement>('[data-go]')!;
+    const msg = form.querySelector<HTMLElement>('[data-msg]')!;
+    // Mirrors the server's floor; the server is the one that enforces it.
+    const MIN = 100;
+    let cents = 0;
+
+    const money = (c: number) =>
+      (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+    function paint() {
+      const ready = cents >= MIN;
+      go.disabled = !ready;
+      go.textContent = ready ? `Give ${money(cents)}` : 'Choose an amount';
+    }
+
+    for (const b of presets) {
+      b.addEventListener('click', () => {
+        cents = Number(b.dataset.amount);
+        other.value = '';
+        for (const x of presets) x.classList.toggle('amount--on', x === b);
+        paint();
+      });
+    }
+
+    other.addEventListener('input', () => {
+      const n = Number(other.value.replace(/[$,\s]/g, ''));
+      // Rounded, not truncated: 12.99 is 1299, not 1298.
+      cents = Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+      for (const x of presets) x.classList.remove('amount--on');
+      paint();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (cents < MIN) return;
+      go.disabled = true;
+      msg.dataset.state = '';
+      msg.textContent = 'Opening the giving page…';
+      try {
+        const res = await fetch('/api/boxoffice/offering', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ slug, amount_cents: cents }),
+        });
+        const body = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+        if (body.ok && body.url) { location.href = body.url; return; }
+        msg.textContent = body.error ?? 'That didn’t go through. Try again?';
+        msg.dataset.state = 'err';
+      } catch {
+        msg.textContent = 'Network trouble. Try again in a moment.';
+        msg.dataset.state = 'err';
+      } finally {
+        paint();
+      }
+    });
+  }
+</script>
+
+<style>
+  .amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 1.4rem 0 1rem; }
+  /* 48px tap targets: this gets used in a lobby, with a coat on. */
+  .amount {
+    min-height: 3.2rem; border-radius: 4px; cursor: pointer;
+    background: var(--ground-2); border: 1px solid var(--rule); color: var(--parchment);
+    font-family: var(--display); font-size: 1.15rem;
+  }
+  .amount:hover { border-color: var(--brass); }
+  .amount--on { border-color: var(--brass); color: var(--brass-lift); background: var(--ground-3); }
+  .other__wrap { display: flex; align-items: center; gap: .5rem; }
+  .other__sign { font-family: var(--display); font-size: 1.2rem; color: var(--brass-lift); }
+  .other input { flex: 1 1 auto; }
+  .give__msg { font-size: .92rem; min-height: 1.3em; margin: .7rem 0 0; color: var(--parchment-dim); }
+  .give__msg[data-state='err'] { color: #e9b4b4; }
+</style>

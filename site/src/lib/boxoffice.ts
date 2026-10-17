@@ -19,6 +19,22 @@ export const TOUR = {
   operators: ['Jeromy', 'Joseph', 'Keely', 'Volunteer'] as const,
 } as const;
 
+/**
+ * The free-will offering, taken by card through a QR on a sign by the door.
+ *
+ * The cash in the basket is still counted by hand and typed into the report;
+ * this is the other half. Every gift comes with the making-of and the songs,
+ * which live in R2 under a prefix the public media route refuses to serve.
+ */
+export const OFFERING = {
+  /** A dollar. Below that the card fee is most of the gift. */
+  minCents: 100,
+  /** Stripe's own ceiling is higher; this is where a typo stops being a gift. */
+  maxCents: 2_500_000,
+  presets: [1000, 2500, 5000, 10000] as const,
+  giftPrefix: 'private/gift/',
+} as const;
+
 export type ProductKind = 'ticket' | 'package' | 'merch';
 
 export interface Product {
@@ -218,7 +234,18 @@ export interface StopReport {
   net_cents: number;
   /** Ten per cent of net — and zero when the stop lost money. */
   tithe_cents: number;
+  /** The free-will offering in cash, counted by hand after the night. */
   offering_cents: number;
+  /** Free-will offerings by card through the QR, less any refunded. */
+  offering_card_cents: number;
+  /** What Stripe took on those card gifts. */
+  offering_fees_cents: number;
+  /** How many people gave by card. */
+  offerings: number;
+  /** Cash counted plus card gifts less the fee: what is handed over. */
+  offering_passed_cents: number;
+  /** What the parish is owed for the night: the tithe plus the offering. */
+  parish_cents: number;
   /** What the tour keeps once the tithe is out. Offerings pass straight on. */
   retained_cents: number;
   attendees: number;
@@ -233,6 +260,9 @@ export function stopReport(input: {
   fees_cents: number;
   rental_cents: number;
   offering_cents: number;
+  offering_card_cents: number;
+  offering_fees_cents: number;
+  offerings: number;
   attendees: number;
   checked_in: number;
 }): StopReport {
@@ -243,12 +273,18 @@ export function stopReport(input: {
   // negative number is a refund request, not a gift.
   const tithe = net > 0 ? Math.round((net * TOUR.tithePercent) / 100) : 0;
 
+  // The free-will offering is collected on the parish's behalf and handed
+  // over whole, so it is reported but never added to what the tour keeps.
+  // A card gift is handed over less only what Stripe took on it — the tour
+  // neither pockets the fee nor eats it.
+  const passed = input.offering_cents + input.offering_card_cents - input.offering_fees_cents;
+
   return {
     ...input,
     net_cents: net,
     tithe_cents: tithe,
-    // The free-will offering is collected on the parish's behalf and handed
-    // over whole, so it is reported but never added to what the tour keeps.
+    offering_passed_cents: passed,
+    parish_cents: tithe + passed,
     retained_cents: net - tithe,
     revenue_per_attendee_cents: input.attendees
       ? Math.round((input.gross_cents - input.refunded_cents) / input.attendees)

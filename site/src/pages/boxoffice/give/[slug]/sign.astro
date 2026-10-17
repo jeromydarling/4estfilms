@@ -1,0 +1,82 @@
+---
+import { getEvent } from '../../../../lib/boxoffice-db';
+import { giveUrl } from '../../../../lib/offering';
+import { showTime } from '../../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * The sign. Print it, stand it by the basket.
+ *
+ * Its own document rather than the box office shell: the shell is a dark
+ * room and this is a sheet of paper. Black on white, one QR as big as the
+ * page allows, and the address in words for the person whose camera will
+ * not cooperate.
+ */
+const slug = String(Astro.params.slug ?? '');
+const tour = slug === 'tour';
+const event = tour ? null : await getEvent(slug);
+if (!tour && (!event || event.status === 'draft')) return new Response('Not found', { status: 404 });
+
+const target = await giveUrl(slug);
+const shown = (target ?? '').replace(/^https?:\/\//, '');
+const title = event ? event.venue : 'His Name is Michael';
+const sub = event
+  ? `${event.city}${event.region ? `, ${event.region}` : ''} · ${showTime(event.starts_at)}`
+  : 'The 2027 tour';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Free-will offering — {title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" />
+  </head>
+  <body>
+    <button class="print" type="button" onclick="print()">Print</button>
+    <main>
+      <p class="eyebrow">Free-will offering</p>
+      <h1>{title}</h1>
+      <p class="sub">{sub}</p>
+      <img class="qr" src={`/boxoffice/qr/give/${slug}.svg`} alt="QR code: scan to give" />
+      <p class="big">Scan to give — any amount.</p>
+      <p class="url">{shown}</p>
+      <p class="thanks">
+        {event
+          ? 'Offerings go to this parish, in full, less only what the card processor takes.'
+          : 'Your gift carries the film to the next town.'}
+        As our thanks, the making-of documentary and the songs from the film
+        come to your inbox.
+      </p>
+      <p class="mark">4est Films · His Name is Michael</p>
+    </main>
+  </body>
+</html>
+
+<style is:global>
+  @page { margin: 0.6in; }
+  html, body { margin: 0; background: #fff; color: #17110D; }
+  body { font-family: 'Crimson Pro', Georgia, serif; text-align: center; padding: 2rem 1.2rem; }
+  main { max-width: 42rem; margin: 0 auto; }
+  .eyebrow {
+    font-family: 'Rye', 'Crimson Pro', serif; font-size: 1rem; letter-spacing: .22em;
+    text-transform: uppercase; color: #7a5a1e; margin: 0 0 .4rem;
+  }
+  h1 { font-family: 'Rye', 'Crimson Pro', serif; font-weight: 400; font-size: clamp(2rem, 6vw, 3.2rem); margin: 0; line-height: 1.1; }
+  .sub { font-size: 1.15rem; color: #5a5048; margin: .5rem 0 1rem; }
+  .qr { display: block; width: min(72vw, 30rem); height: auto; margin: 1.2rem auto; }
+  .big { font-size: 1.6rem; font-weight: 600; margin: .4rem 0; }
+  .url { font-family: ui-monospace, Menlo, monospace; font-size: 1.1rem; color: #3b332c; margin: 0 0 1.2rem; word-break: break-all; }
+  .thanks { font-size: 1.1rem; color: #4a423a; max-width: 32rem; margin: 0 auto 1.6rem; line-height: 1.5; }
+  .mark { font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; color: #8b857a; }
+  .print {
+    position: fixed; top: 1rem; right: 1rem; font: inherit; padding: .5rem 1rem;
+    background: #17110D; color: #fff; border: 0; border-radius: 3px; cursor: pointer;
+  }
+  @media print { .print { display: none; } body { padding: 0; } .qr { width: 5.6in; } }
+</style>

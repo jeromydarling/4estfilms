@@ -159,6 +159,12 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
       </p>
     </form>
   )}
+
+  <p class="give fine">
+    If the night moves you — <a href={`/boxoffice/give/${event.slug}/`}>a free-will offering</a>,
+    any amount. It goes to the parish, and the making-of documentary and the
+    songs from the film come with it.
+  </p>
 </BoxOffice>
 
 <script>
@@ -411,6 +417,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
 
   .shop__msg { font-size: .92rem; min-height: 1.3em; margin: .7rem 0 0; color: var(--parchment-dim); }
   .shop__msg[data-state='err'] { color: #e9b4b4; }
+  .give { margin-top: 2.2rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
 
   .sr {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

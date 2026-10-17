@@ -1,0 +1,54 @@
+---
+import BoxOffice from '../../../layouts/BoxOffice.astro';
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+/**
+ * After a gift.
+ *
+ * Unlike the ticket page this one does open the gift directly when the
+ * webhook has landed, because the person is usually standing in a lobby
+ * with a phone and no patience for an inbox. The session id in the URL is
+ * one only Stripe and the giver ever held, and what it unlocks is a
+ * documentary — a different weight of thing from a seat at a door.
+ */
+const session = (Astro.url.searchParams.get('session') ?? '').slice(0, 120);
+let token: string | null = null;
+if (/^cs_[A-Za-z0-9_]+$/.test(session) && env.DB) {
+  const row = await env.DB
+    .prepare(`SELECT gift_token FROM bo_offerings WHERE stripe_session_id = ?1`)
+    .bind(session)
+    .first<{ gift_token: string }>();
+  token = row?.gift_token ?? null;
+}
+---
+
+<BoxOffice title="Thank you — 4est Films" description="Your gift is recorded.">
+  <p class="eyebrow">Received</p>
+  <h1>Thank you.</h1>
+
+  {token ? (
+    <>
+      <p class="note note--good">
+        Your gift is recorded, and your thank-you is ready: the making-of
+        documentary and the songs from the film. The same link is on its way
+        to your inbox, and it doesn’t expire.
+      </p>
+      <p style="margin-top:1.4rem"><a class="btn" href={`/boxoffice/gift/${token}/`}>Open your gift</a></p>
+    </>
+  ) : (
+    <p class="note">
+      Your gift is being recorded now. Within a minute or two a link to the
+      making-of documentary and the songs from the film will land in your
+      inbox. You don’t need to stay on this page.
+    </p>
+  )}
+
+  <p class="dim">
+    Stripe sends the receipt. If nothing arrives, check the spam folder first,
+    then write to <a href="mailto:hello@4estfilms.studio">hello@4estfilms.studio</a>.
+  </p>
+
+  <p style="margin-top:2rem"><a class="btn btn--quiet" href="/boxoffice/">The rest of the tour</a></p>
+</BoxOffice>

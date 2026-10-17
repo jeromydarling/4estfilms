@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { encode } from 'uqr';
 import { isAdmin } from '../../../lib/admin';
+import { qrSvg, svgResponse } from '../../../lib/qr';
 
 export const prerender = false;
 
@@ -27,21 +27,5 @@ export const GET: APIRoute = async ({ request, url }) => {
     return new Response('refused', { status: 400 });
   }
 
-  const qr = encode(target.href, { ecc: 'M', border: 0 });
-  const quiet = 4;
-  const side = qr.size + quiet * 2;
-  let d = '';
-  for (let y = 0; y < qr.size; y++) {
-    for (let x = 0; x < qr.size; x++) {
-      if (qr.data[y][x]) d += `M${x + quiet} ${y + quiet}h1v1h-1z`;
-    }
-  }
-
-  return new Response(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}" ` +
-      `width="${side * 8}" height="${side * 8}" shape-rendering="crispEdges" role="img" ` +
-      `aria-label="Scan to pay"><rect width="${side}" height="${side}" fill="#fff"/>` +
-      `<path d="${d}" fill="#17110D"/></svg>`,
-    { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'no-store' } }
-  );
+  return svgResponse(qrSvg(target.href, 'Scan to pay'), 'no-store');
 };

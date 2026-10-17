@@ -2,7 +2,7 @@
 import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
 import { getEvent } from '../../../lib/boxoffice-db';
-import { salesByCode, soldBySku, stopTotals } from '../../../lib/boxoffice-report';
+import { offeringsAt, salesByCode, soldBySku, stopTotals } from '../../../lib/boxoffice-report';
 import { TOUR, money, showTime } from '../../../lib/boxoffice';
 import { env } from 'cloudflare:workers';
 
@@ -15,9 +15,10 @@ const event = await getEvent(slug);
 if (!event) return Astro.redirect('/admin/boxoffice/');
 
 const [totals] = await stopTotals(event.id);
-const [items, codes, orders] = await Promise.all([
+const [items, codes, gifts, orders] = await Promise.all([
   soldBySku(event.id),
   salesByCode(event.id),
+  offeringsAt(event.id),
   env.DB
     .prepare(
       `SELECT o.id, o.buyer_name, o.buyer_email, o.channel, o.status, o.total_cents,
@@ -45,6 +46,8 @@ const merch = items.filter((i) => i.admits === 0);
     <a class="lnk" href={`/admin/boxoffice/event/?slug=${event.slug}`}>Edit stop</a>
     <a class="lnk" href={`/api/admin/boxoffice/export?what=stop&slug=${event.slug}`}>Stop CSV</a>
     <a class="lnk" href={`/api/admin/boxoffice/export?what=orders&slug=${event.slug}`}>Orders CSV</a>
+    <a class="lnk" href={`/boxoffice/give/${event.slug}/sign/`} target="_blank" rel="noopener">Offering sign (print)</a>
+    <a class="lnk" href={`/boxoffice/give/${event.slug}/`} target="_blank" rel="noopener">Offering page</a>
   </p>
 
   <h2>The money</h2>
@@ -65,8 +68,14 @@ const merch = items.filter((i) => i.admits === 0);
             <td class="right num">{money(totals.tithe_cents)}</td></tr>
         <tr><td><strong>Retained by the tour</strong></td>
             <td class="right num"><strong>{money(totals.retained_cents)}</strong></td></tr>
-        <tr class="rule"><td>Free-will offering <span class="muted">(counted by hand; passed on whole)</span></td>
+        <tr class="rule"><td>Free-will offering — cash <span class="muted">(counted by hand)</span></td>
             <td class="right num">{money(totals.offering_cents)}</td></tr>
+        <tr><td>Free-will offering — by card, {totals.offerings} {totals.offerings === 1 ? 'gift' : 'gifts'}
+              <span class="muted">(less {money(totals.offering_fees_cents)} Stripe took)</span></td>
+            <td class="right num">{money(totals.offering_card_cents - totals.offering_fees_cents)}</td></tr>
+        <tr class="rule"><td><strong>To the parish</strong>
+              <span class="muted">(tithe + offerings, passed on whole)</span></td>
+            <td class="right num"><strong>{money(totals.parish_cents)}</strong></td></tr>
       </tbody>
     </table>
   </div>
@@ -146,6 +155,26 @@ const merch = items.filter((i) => i.admits === 0);
               </tr>
             ))
           : <tr><td colspan="5" class="empty">No code has been used at this stop.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Card offerings</h2>
+  <p class="muted small">
+    Through the QR on the sign. The cash in the basket is typed in above.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>When</th><th>Giver</th><th class="right">Gift</th><th class="right">Fee</th></tr></thead>
+      <tbody>
+        {gifts.length ? gifts.map((g) => (
+          <tr class={g.refunded_cents >= g.amount_cents ? 'off' : ''}>
+            <td class="num">{g.created_at.slice(0, 16).replace('T', ' ')}</td>
+            <td>{g.giver_name ?? '—'}<br /><span class="muted">{g.giver_email ?? ''}</span></td>
+            <td class="right num">{money(g.amount_cents)}</td>
+            <td class="right num">{money(g.fee_cents)}</td>
+          </tr>
+        )) : <tr><td colspan="4" class="empty">No card offerings yet.</td></tr>}
       </tbody>
     </table>
   </div>

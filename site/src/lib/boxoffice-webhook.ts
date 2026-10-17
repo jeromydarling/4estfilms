@@ -1,6 +1,7 @@
+import { env } from 'cloudflare:workers';
 import { getEventById, getOffered, getProducts, recordOrder } from './boxoffice-db';
 import { money, priceBasket, showTime, stripeKey, type BasketLine } from './boxoffice';
-import { layout, send, SITE } from './email';
+import { layout, newToken, send, SITE } from './email';
 import type { CheckoutSession } from './stripe';
 
 /**
@@ -185,5 +186,101 @@ async function sendTickets(t: {
       `Ticket codes:\n${t.codes.join('\n')}\n\n` +
       `Show a code at the door. If your battery dies we can find you by name.`,
     campaign: 'boxoffice-tickets',
+  });
+}
+
+/**
+ * A free-will offering, once Stripe says the money moved.
+ *
+ * Recorded against the stop whose QR was scanned (or no stop at all, for a
+ * gift to the tour), with the fee Stripe actually took, and answered with the
+ * gift: a link to the making-of and the songs. The link is the thank-you, so
+ * like the ticket email it is logged loudly if it fails and never retried
+ * into a duplicate.
+ */
+export async function onOffering(s: CheckoutSession, country: string | null): Promise<Response> {
+  const amount = typeof s.amount_total === 'number' ? s.amount_total : 0;
+  if (amount <= 0) return new Response('nothing taken', { status: 200 });
+
+  const eventId = Number(s.metadata?.event_id);
+  const event = Number.isFinite(eventId) && eventId > 0 ? await getEventById(eventId) : null;
+
+  let fee = 0;
+  const { key } = stripeKey();
+  if (s.payment_intent && key) fee = (await actualFeeCents(s.payment_intent, key)) ?? 0;
+
+  const email = (s.customer_details?.email ?? s.customer_email ?? '').trim().toLowerCase() || null;
+  const name = (s.customer_details?.name ?? '').trim() || null;
+  const token = newToken();
+
+  const ins = await env.DB
+    .prepare(
+      `INSERT INTO bo_offerings
+         (event_id, stripe_session_id, stripe_payment_intent, amount_cents, fee_cents,
+          giver_name, giver_email, gift_token, ip_country)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+       ON CONFLICT(stripe_session_id) DO NOTHING`
+    )
+    .bind(event?.id ?? null, s.id, s.payment_intent ?? null, amount, fee, name, email, token, country)
+    .run();
+
+  if ((ins.meta?.changes ?? 0) === 0) return new Response('duplicate', { status: 200 });
+
+  try {
+    if (email) {
+      await sendGift({
+        to: email,
+        name,
+        amount,
+        venue: event?.venue ?? null,
+        city: event ? `${event.city}${event.region ? `, ${event.region}` : ''}` : null,
+        href: `${SITE}/boxoffice/gift/${token}/`,
+      });
+    }
+  } catch (err) {
+    console.error('OFFERING GIFT EMAIL FAILED', { session: s.id, err });
+  }
+
+  return new Response('ok', { status: 200 });
+}
+
+async function sendGift(g: {
+  to: string;
+  name: string | null;
+  amount: number;
+  venue: string | null;
+  city: string | null;
+  href: string;
+}) {
+  const hello = g.name ? `Thank you, ${g.name.split(' ')[0]}.` : 'Thank you.';
+  const where = g.venue ? `at ${g.venue}, ${g.city}` : 'to the 2027 tour';
+  const goes = g.venue
+    ? 'Free-will offerings go to the parish that opened its doors for the night — in full, ' +
+      'less only what the card processor takes.'
+    : 'It carries the film to the next town: the projector, the drive, the room.';
+
+  await send({
+    to: g.to,
+    subject: g.venue ? `Thank you — your gift at ${g.venue}` : 'Thank you for your gift to the tour',
+    html: layout({
+      preheader: 'The making-of and the songs from the film, yours to keep.',
+      heading: hello,
+      body:
+        `<p style="margin:0 0 14px;">Your gift of <strong>${money(g.amount)}</strong> ${where} — thank you.</p>` +
+        `<p style="margin:0 0 14px;">${goes}</p>` +
+        `<p style="margin:0 0 14px;">As our thanks: the making-of documentary and the songs from ` +
+        `<em>His Name is Michael</em>, yours to keep. The link below is yours and doesn’t expire.</p>` +
+        `<p style="margin:0;">Stripe has sent your receipt separately.</p>`,
+      cta: { href: g.href, label: 'Open your gift' },
+      footer:
+        `Or paste this into your browser:<br>` +
+        `<span style="color:#8b857a;word-break:break-all;">${g.href}</span><br><br>` +
+        `4est Films &middot; Independent Film Production &middot; Est. 2015`,
+    }),
+    text:
+      `${hello}\n\nYour gift of ${money(g.amount)} ${where} — thank you.\n\n${goes}\n\n` +
+      `As our thanks: the making-of documentary and the songs from His Name is Michael, ` +
+      `yours to keep.\n\n${g.href}\n\nThe link is yours and doesn't expire. Stripe has sent your receipt separately.`,
+    campaign: 'boxoffice-offering',
   });
 }

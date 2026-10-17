@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { isAdmin } from '../../../../lib/admin';
 import { getEvent } from '../../../../lib/boxoffice-db';
-import { salesByCode, soldBySku, stopTotals } from '../../../../lib/boxoffice-report';
+import { allOfferings, salesByCode, soldBySku, stopTotals } from '../../../../lib/boxoffice-report';
 import { TOUR, csv } from '../../../../lib/boxoffice';
 
 export const prerender = false;
@@ -39,13 +39,34 @@ export const GET: APIRoute = async ({ request, url }) => {
       csv(
         ['leg', 'stop', 'city', 'region', 'date', 'capacity', 'seats_sold', 'checked_in',
          'orders', 'door_orders', 'gross', 'discounts', 'refunds', 'stripe_fees', 'rental',
-         'net', `tithe_${TOUR.tithePercent}pc`, 'offering', 'retained', 'revenue_per_attendee'],
+         'net', `tithe_${TOUR.tithePercent}pc`, 'offering_cash', 'offering_card_gifts',
+         'offering_card', 'offering_card_fees', 'offering_passed', 'to_parish', 'retained',
+         'revenue_per_attendee'],
         stops.map((s) => [
           s.leg ?? '', s.venue, s.city, s.region ?? '', s.starts_at, s.capacity,
           s.attendees, s.checked_in, s.orders, s.door_orders,
           d(s.gross_cents), d(s.discount_cents), d(s.refunded_cents), d(s.fees_cents),
           d(s.rental_cents), d(s.net_cents), d(s.tithe_cents), d(s.offering_cents),
+          s.offerings, d(s.offering_card_cents), d(s.offering_fees_cents),
+          d(s.offering_passed_cents), d(s.parish_cents),
           d(s.retained_cents), d(s.revenue_per_attendee_cents),
+        ])
+      )
+    );
+  }
+
+  // Every card offering on the tour, one row each, for reconciling against
+  // the Stripe payout and for the thank-you list.
+  if (what === 'offerings') {
+    const gifts = await allOfferings();
+    return file(
+      `offerings-${TOUR.year}-${stamp}.csv`,
+      csv(
+        ['when', 'stop', 'venue', 'giver', 'email', 'gift', 'stripe_fee', 'refunded', 'passed_on'],
+        gifts.map((g) => [
+          g.created_at, g.slug ?? '(tour)', g.venue ?? 'The tour', g.giver_name, g.giver_email,
+          d(g.amount_cents), d(g.fee_cents), d(g.refunded_cents),
+          d(g.amount_cents - g.refunded_cents - g.fee_cents),
         ])
       )
     );
@@ -63,7 +84,13 @@ export const GET: APIRoute = async ({ request, url }) => {
       ['Gross', d(t.gross_cents)], ['Refunds', d(t.refunded_cents)],
       ['Stripe fees', d(t.fees_cents)], ['Rental', d(t.rental_cents)],
       ['Net', d(t.net_cents)], [`Tithe ${TOUR.tithePercent}%`, d(t.tithe_cents)],
-      ['Retained', d(t.retained_cents)], ['Offering', d(t.offering_cents)], [],
+      ['Retained', d(t.retained_cents)], [],
+      ['Offering, cash counted', d(t.offering_cents)],
+      ['Offering, by card (gifts)', t.offerings],
+      ['Offering, by card', d(t.offering_card_cents)],
+      ['Offering, card fees', d(t.offering_fees_cents)],
+      ['Offering passed on', d(t.offering_passed_cents)],
+      ['To the parish (tithe + offering)', d(t.parish_cents)], [],
       ['Seats sold', t.attendees], ['Checked in', t.checked_in],
       ['Cash taken', d(t.cash_cents)], ['Revenue per attendee', d(t.revenue_per_attendee_cents)], [],
       ['Item', 'Units', 'Seats', 'Gross'],
