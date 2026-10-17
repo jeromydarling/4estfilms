@@ -39,7 +39,7 @@ function newId(): string {
   return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-function readCookie(request: Request, name: string): string | null {
+export function readCookie(request: Request, name: string): string | null {
   const raw = request.headers.get('cookie');
   if (!raw) return null;
   for (const part of raw.split(';')) {

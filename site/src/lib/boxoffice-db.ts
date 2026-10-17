@@ -70,11 +70,34 @@ export async function sizedSkus(): Promise<Set<string>> {
  * are what capacity has to mean.
  */
 export async function soldAdmits(eventId: number): Promise<number> {
+  // Plus the seats an unpaid group invoice is holding: a parish that has
+  // been promised forty seats on a cheque must not find them sold under it.
   const r = await db()
-    .prepare(`SELECT COUNT(*) AS n FROM bo_tickets WHERE event_id = ?1 AND void_at IS NULL`)
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM bo_tickets WHERE event_id = ?1 AND void_at IS NULL)
+            + (SELECT COALESCE(SUM(reserved_admits), 0) FROM bo_orders
+                WHERE event_id = ?1 AND status = 'unpaid') AS n`
+    )
     .bind(eventId)
     .first<{ n: number }>();
   return r?.n ?? 0;
+}
+
+/**
+ * Mint tickets for an order that exists without any — a group invoice that
+ * has just been paid. Same shape as the tickets recordOrder writes, so the
+ * door cannot tell the difference.
+ */
+export async function mintTickets(orderId: number, event: EventRow, admits: number, label: string | null): Promise<string[]> {
+  const d = db();
+  const codes = Array.from({ length: admits }, () => newTicketCode());
+  const stmts = codes.map((code, i) =>
+    d
+      .prepare(`INSERT INTO bo_tickets (code, order_id, event_id, label, seq) VALUES (?1, ?2, ?3, ?4, ?5)`)
+      .bind(code, orderId, event.id, label, i + 1)
+  );
+  if (stmts.length) await d.batch(stmts);
+  return codes;
 }
 
 export interface PromoRow {
@@ -121,11 +144,15 @@ export interface RecordOrderInput {
   total_cents: number;
   fee_cents: number;
   promo_code: string | null;
-  channel: 'web' | 'door_card' | 'door_cash';
+  channel: 'web' | 'door_card' | 'door_cash' | 'comp';
   buyer_name?: string | null;
   buyer_email?: string | null;
   buyer_phone?: string | null;
   operator?: string | null;
+  /** Sales tax Stripe collected on top of the total. Zero for cash and comps. */
+  tax_cents?: number;
+  /** Why a comp was issued, or anything else worth remembering. */
+  note?: string | null;
   stripe_session_id?: string | null;
   stripe_payment_intent?: string | null;
   /** A door device's id for a sale it made offline. Makes replay safe. */
@@ -187,8 +214,8 @@ export async function recordOrder(input: RecordOrderInput): Promise<RecordedOrde
         `INSERT INTO bo_orders
            (event_id, stripe_session_id, stripe_payment_intent, offline_id,
             buyer_name, buyer_email, buyer_phone, subtotal_cents, discount_cents,
-            total_cents, fee_cents, promo_code, channel, operator)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)`
+            total_cents, fee_cents, promo_code, channel, operator, tax_cents, note)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)`
       )
       .bind(
         input.event.id,
@@ -204,7 +231,9 @@ export async function recordOrder(input: RecordOrderInput): Promise<RecordedOrde
         input.fee_cents,
         input.promo_code,
         input.channel,
-        input.operator ?? null
+        input.operator ?? null,
+        input.tax_cents ?? 0,
+        input.note ?? null
       )
   );
 
@@ -281,7 +310,8 @@ export type Quote =
 export async function quote(
   event: EventRow,
   basket: BasketLine[],
-  promoCode?: string | null
+  promoCode?: string | null,
+  opts: { door?: boolean } = {}
 ): Promise<Quote> {
   const [products, offered] = await Promise.all([getProducts(), getOffered(event.id)]);
   const { promo, error: promoError } = promoCode
@@ -293,8 +323,10 @@ export async function quote(
   const priced = priceBasket(basket, products, offered, promo);
   if (priced.error) return { ok: false, error: priced.error };
 
+  // Holds come off what the web may sell. The door is the house's own hand
+  // and sells into them — that is what they are held for.
   const sold = await soldAdmits(event.id);
-  const left = event.capacity - sold;
+  const left = (opts.door ? event.capacity : event.capacity - (event.holds ?? 0)) - sold;
   if (priced.admits > left) {
     return {
       ok: false,

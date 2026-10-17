@@ -42,26 +42,42 @@ export async function stopTotals(eventId?: number): Promise<StopTotals[]> {
               COALESCE(o.refunded, 0)     AS refunded_cents,
               COALESCE(o.fees, 0)         AS fees_cents,
               COALESCE(o.cash, 0)         AS cash_cents,
+              COALESCE(o.tax, 0)          AS tax_cents,
+              COALESCE(o.reserved, 0)     AS reserved_admits,
               COALESCE(t.attendees, 0)    AS attendees,
-              COALESCE(t.checked_in, 0)   AS checked_in
+              COALESCE(t.checked_in, 0)   AS checked_in,
+              COALESCE(t.comp_seats, 0)   AS comp_seats,
+              COALESCE(s.tithe, 0)        AS tithe_paid_cents,
+              COALESCE(s.offering, 0)     AS offering_paid_cents,
+              COALESCE(s.rental, 0)       AS rental_paid_cents
          FROM bo_events e
          LEFT JOIN (
            SELECT event_id,
-                  COUNT(*)                                             AS orders,
-                  SUM(CASE WHEN channel <> 'web' THEN 1 ELSE 0 END)    AS door_orders,
-                  SUM(total_cents)                                     AS gross,
+                  SUM(CASE WHEN status <> 'cancelled' THEN 1 ELSE 0 END) AS orders,
+                  SUM(CASE WHEN channel IN ('door_card','door_cash') THEN 1 ELSE 0 END) AS door_orders,
+                  SUM(CASE WHEN status IN ('paid','refunded') THEN total_cents ELSE 0 END) AS gross,
                   SUM(discount_cents)                                  AS discount,
                   SUM(refunded_cents)                                  AS refunded,
                   SUM(fee_cents)                                       AS fees,
-                  SUM(CASE WHEN channel = 'door_cash' THEN total_cents ELSE 0 END) AS cash
+                  SUM(CASE WHEN channel = 'door_cash' THEN total_cents ELSE 0 END) AS cash,
+                  SUM(CASE WHEN status = 'paid' THEN tax_cents ELSE 0 END) AS tax,
+                  SUM(CASE WHEN status = 'unpaid' THEN reserved_admits ELSE 0 END) AS reserved
              FROM bo_orders GROUP BY event_id
          ) o ON o.event_id = e.id
          LEFT JOIN (
-           SELECT event_id,
-                  SUM(CASE WHEN void_at IS NULL THEN 1 ELSE 0 END)     AS attendees,
-                  SUM(CASE WHEN void_at IS NULL AND checked_in_at IS NOT NULL THEN 1 ELSE 0 END) AS checked_in
-             FROM bo_tickets GROUP BY event_id
+           SELECT k.event_id,
+                  SUM(CASE WHEN k.void_at IS NULL THEN 1 ELSE 0 END)     AS attendees,
+                  SUM(CASE WHEN k.void_at IS NULL AND k.checked_in_at IS NOT NULL THEN 1 ELSE 0 END) AS checked_in,
+                  SUM(CASE WHEN k.void_at IS NULL AND r.channel = 'comp' THEN 1 ELSE 0 END) AS comp_seats
+             FROM bo_tickets k JOIN bo_orders r ON r.id = k.order_id GROUP BY k.event_id
          ) t ON t.event_id = e.id
+         LEFT JOIN (
+           SELECT event_id,
+                  SUM(CASE WHEN kind = 'tithe' THEN amount_cents ELSE 0 END)    AS tithe,
+                  SUM(CASE WHEN kind = 'offering' THEN amount_cents ELSE 0 END) AS offering,
+                  SUM(CASE WHEN kind = 'rental' THEN amount_cents ELSE 0 END)   AS rental
+             FROM bo_settlements GROUP BY event_id
+         ) s ON s.event_id = e.id
          LEFT JOIN (
            SELECT event_id,
                   COUNT(*)                            AS gifts,
@@ -97,6 +113,12 @@ export async function stopTotals(eventId?: number): Promise<StopTotals[]> {
       offering_card_cents: Number(r.offering_card_cents),
       offering_fees_cents: Number(r.offering_fees_cents),
       offerings: Number(r.offerings),
+      comp_seats: Number(r.comp_seats),
+      reserved_admits: Number(r.reserved_admits),
+      tax_cents: Number(r.tax_cents),
+      tithe_paid_cents: Number(r.tithe_paid_cents),
+      offering_paid_cents: Number(r.offering_paid_cents),
+      rental_paid_cents: Number(r.rental_paid_cents),
       attendees: Number(r.attendees),
       checked_in: Number(r.checked_in),
     }),
@@ -240,4 +262,87 @@ export async function allOfferings(): Promise<OfferingLine[]> {
     giver_email: (r.giver_email as string | null) ?? null,
     created_at: String(r.created_at),
   }));
+}
+
+export interface SettlementLine {
+  id: number;
+  kind: string;
+  amount_cents: number;
+  paid_at: string;
+  method: string | null;
+  note: string | null;
+}
+
+/** What has gone out to this stop's parish and house, newest first. */
+export async function settlementsAt(eventId: number): Promise<SettlementLine[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT id, kind, amount_cents, paid_at, method, note
+         FROM bo_settlements WHERE event_id = ?1 ORDER BY paid_at DESC, id DESC`
+    )
+    .bind(eventId)
+    .all<SettlementLine>();
+  return r.results ?? [];
+}
+
+export interface WaitlistLine {
+  id: number;
+  email: string;
+  name: string | null;
+  created_at: string;
+  notified_at: string | null;
+}
+
+export async function waitlistAt(eventId: number): Promise<WaitlistLine[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT id, email, name, created_at, notified_at
+         FROM bo_waitlist WHERE event_id = ?1 ORDER BY created_at`
+    )
+    .bind(eventId)
+    .all<WaitlistLine>();
+  return r.results ?? [];
+}
+
+/**
+ * Everyone with a live seat at a stop and an address to write to. One row
+ * per address, so a family that bought twice is written to once.
+ */
+export async function buyersAt(eventId: number): Promise<{ email: string; name: string | null }[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT lower(buyer_email) AS email, MIN(buyer_name) AS name
+         FROM bo_orders
+        WHERE event_id = ?1 AND status = 'paid' AND buyer_email IS NOT NULL AND buyer_email <> ''
+        GROUP BY lower(buyer_email) ORDER BY email`
+    )
+    .bind(eventId)
+    .all<{ email: string; name: string | null }>();
+  return r.results ?? [];
+}
+
+export interface InvoiceLine {
+  id: number;
+  buyer_name: string | null;
+  buyer_email: string | null;
+  total_cents: number;
+  reserved_admits: number;
+  status: string;
+  reference: string | null;
+  note: string | null;
+  created_at: string;
+  seats: number;
+}
+
+export async function invoicesAt(eventId: number): Promise<InvoiceLine[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT o.id, o.buyer_name, o.buyer_email, o.total_cents, o.reserved_admits, o.status,
+              o.reference, o.note, o.created_at,
+              (SELECT COUNT(*) FROM bo_tickets t WHERE t.order_id = o.id AND t.void_at IS NULL) AS seats
+         FROM bo_orders o WHERE o.event_id = ?1 AND o.channel = 'invoice' ORDER BY o.created_at DESC`
+    )
+    .bind(eventId)
+    .all<InvoiceLine>();
+  return r.results ?? [];
 }

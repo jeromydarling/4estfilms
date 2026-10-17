@@ -89,10 +89,47 @@ wrangler r2 object put 4estfilms-media/private/gift/01-making-of.mp4 --file maki
 **Test first.** The box office refuses an `sk_live_` key unless `BOXOFFICE_LIVE`
 is explicitly `true`, so a rehearsal cannot charge a real card.
 
+### Running a hundred doors
+
+Everything below lives on a stop's report page (`/admin/boxoffice/report/?slug=`).
+
+| | |
+| --- | --- |
+| **Door PIN** | Four digits per stop. Opens `/boxoffice/door/<stop>/` and nothing else — not another stop, not a refund, not a report. Session lasts twenty hours; ten wrong tries and the address waits fifteen minutes. "New PIN" revokes the old one at once. |
+| **Host's page** | `/boxoffice/host/<token>/` — read-only for the parish coordinator: seats sold, their own codes, what they're owed and what's been paid. No buyer names, no fees, no tour-side figures. "New link" revokes the old one. |
+| **Holds** | Seats kept off the web (clergy, press, the crew's family). The door still sells them. On the stop form. |
+| **Comps** | Real tickets at $0 — they scan, they count as a body, they show as a seat given away. Emailed if an address is given. |
+| **Group invoices** | A parish buying forty seats on a cheque. Created, the seats are held against capacity and nothing is minted; marked paid (with the cheque number), the tickets are minted and sent; cancelled, the seats go back. |
+| **Settling up** | Record each payment out — tithe, offering, rental — and the report shows what's still due. The **settlement statement** is one printable sheet to hand the pastor. The dashboard's "Still to pay out" tile is every past stop not yet settled. |
+| **Waitlist** | A sold-out stop takes names. When a second showing opens, "Send to the waitlist" writes to each person once. |
+| **The morning after** | "Send to ticket holders" — a prefilled thank-you with the offering link, one per address. |
+| **Device names** | Each door phone names itself once ("Door A"); check-ins carry it, so a double scan can be traced. Doors refresh from the server every half minute while online, so a seat scanned on one phone shows on the next. |
+
+**Sales tax** runs through Stripe Tax when `BOXOFFICE_TAX=true` — activate Stripe
+Tax in the dashboard first, or every checkout fails. Tickets use Stripe's own
+default for ticket sales (`txcd_20030000`, General – Services) and merch the
+general tangible-goods code (`txcd_99999999`); both can be overridden with
+`BOXOFFICE_TAX_CODE_TICKET` / `BOXOFFICE_TAX_CODE_MERCH`. Tax is exclusive — a
+$15 ticket is $15 in every state — and recorded on the order as `tax_cents`,
+outside gross. The venue-sourced amusement codes need a performance location
+Checkout can't carry; that's the thing to come back for if a state demands it.
+
+**The digest** — `POST /api/admin/boxoffice/digest` with the admin bearer token —
+emails yesterday's sales by stop, soft stops in the next fortnight, parishes
+still owed, waitlists and low stock to `DIGEST_TO` (or the house address).
+The `Box office digest` workflow fires it every morning; it needs `ADMIN_TOKEN`
+in the production environment's secrets.
+
+**Not here, by design:** Tap to Pay. The door's card path (a QR the buyer pays
+on their own phone) is the right call for a web app; a card reader for a queue
+of two hundred needs Stripe Terminal hardware and its JS SDK — an afternoon,
+once there's a reader to test against.
+
 ## Workflows
 
 | Workflow | When |
 | --- | --- |
+| `Box office digest` | Every morning at 12:45 UTC, and by hand. Asks the Worker to send the day's box office email. Needs `ADMIN_TOKEN` in the production environment. |
 | `ci.yml` | every push — typecheck and build |
 | `deploy.yml` | push to `main` |
 | `migrate.yml` | manual. Applies every migration in order; already-applied ones are expected no-ops |

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { isAdmin } from '../../../lib/admin';
+import { doorEvent } from '../../../lib/door';
 import { qrSvg, svgResponse } from '../../../lib/qr';
 
 export const prerender = false;
@@ -9,12 +10,14 @@ export const prerender = false;
  * carrying a terminal: the buyer scans this off the operator's screen and
  * pays on their own phone.
  *
- * Admin-only and restricted to Stripe's own host — otherwise this is a free
- * QR generator for anybody's URL, served from our domain, which is exactly
- * the shape of thing that ends up in a phishing email.
+ * Admin or a door session, and restricted to Stripe's own host — otherwise
+ * this is a free QR generator for anybody's URL, served from our domain,
+ * which is exactly the shape of thing that ends up in a phishing email.
  */
 export const GET: APIRoute = async ({ request, url }) => {
-  if (!(await isAdmin(request, url))) return new Response('not found', { status: 404 });
+  if (!(await isAdmin(request, url)) && (await doorEvent(request)) === null) {
+    return new Response('not found', { status: 404 });
+  }
 
   const raw = url.searchParams.get('u') ?? '';
   let target: URL;

@@ -15,7 +15,8 @@ const [products, offered, sold] = await Promise.all([
   soldAdmits(event.id),
 ]);
 
-const left = event.capacity - sold;
+// Holds come off what the web may sell; the door still has them.
+const left = event.capacity - (event.holds ?? 0) - sold;
 const soldOut = left <= 0;
 const onSale = event.status === 'on_sale' && !soldOut;
 // Same reason as the index: `<=` in a JSX expression starts an element.
@@ -58,8 +59,8 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
   {!onSale ? (
     <div class={`note ${soldOut ? 'note--bad' : ''}`}>
       {soldOut
-        ? <>This stop is <strong>sold out</strong>. If we add a second showing you’ll hear it first —
-            <a href="/#notify">put your address in</a>.</>
+        ? <>This stop is <strong>sold out</strong>. If we add a second showing here, the
+            people on this list hear first.</>
         : <>Tickets for this stop aren’t on sale yet.</>}
     </div>
   ) : (
@@ -151,12 +152,27 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         <p class="fine" data-seats></p>
       </div>
 
+      <label class="opt">
+        <input type="checkbox" name="subscribe" checked />
+        <span>Keep me posted on the tour — where it goes next, and when.</span>
+      </label>
+
       <button class="btn" type="submit" data-go disabled>Choose your tickets</button>
       <p class="shop__msg" role="status" aria-live="polite" data-msg></p>
       <p class="fine">
         Card, Apple Pay or Google Pay, handled by Stripe. Your tickets arrive by
         email with a code for each seat.
       </p>
+    </form>
+  )}
+
+  {soldOut && event.status === 'on_sale' && (
+    <form class="wait" data-wait data-slug={event.slug}>
+      <label class="field"><span>Your name</span><input name="name" autocomplete="name" /></label>
+      <label class="field"><span>Email</span><input name="email" type="email" required autocomplete="email" /></label>
+      <input name="website" tabindex="-1" autocomplete="off" class="sr" aria-hidden="true" />
+      <button class="btn" type="submit">Put me on the list</button>
+      <p class="shop__msg" role="status" aria-live="polite" data-waitmsg></p>
     </form>
   )}
 
@@ -327,7 +343,10 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         const res = await fetch('/api/boxoffice/checkout', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ slug, basket: basket(), promo: appliedPromo }),
+          body: JSON.stringify({
+            slug, basket: basket(), promo: appliedPromo,
+            subscribe: form.querySelector<HTMLInputElement>('[name="subscribe"]')?.checked === true,
+          }),
         });
         const body = await res.json() as { ok?: boolean; url?: string; error?: string };
         if (body.ok && body.url) { location.href = body.url; return; }
@@ -338,6 +357,44 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         msg.dataset.state = 'err';
       } finally {
         go.disabled = false;
+      }
+    });
+  }
+
+  // The waitlist, for a stop with no seats left.
+  const waitForm = document.querySelector<HTMLFormElement>('[data-wait]');
+  if (waitForm) {
+    const wf = waitForm;
+    const wmsg = wf.querySelector<HTMLElement>('[data-waitmsg]')!;
+    wf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = wf.querySelector<HTMLButtonElement>('button')!;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/boxoffice/waitlist', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            slug: wf.dataset.slug,
+            name: (wf.querySelector('[name="name"]') as HTMLInputElement).value,
+            email: (wf.querySelector('[name="email"]') as HTMLInputElement).value,
+            website: (wf.querySelector('[name="website"]') as HTMLInputElement).value,
+          }),
+        });
+        const b = (await res.json()) as { ok?: boolean; error?: string };
+        if (b.ok) {
+          wmsg.textContent = 'You’re on the list. If seats open here, you’ll hear first.';
+          wmsg.dataset.state = '';
+          wf.reset();
+        } else {
+          wmsg.textContent = b.error ?? 'That didn’t go through.';
+          wmsg.dataset.state = 'err';
+        }
+      } catch {
+        wmsg.textContent = 'Network trouble. Try again in a moment.';
+        wmsg.dataset.state = 'err';
+      } finally {
+        btn.disabled = false;
       }
     });
   }
@@ -418,6 +475,9 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
   .shop__msg { font-size: .92rem; min-height: 1.3em; margin: .7rem 0 0; color: var(--parchment-dim); }
   .shop__msg[data-state='err'] { color: #e9b4b4; }
   .give { margin-top: 2.2rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
+  .wait { margin-top: 1.4rem; }
+  .opt { display: flex; gap: .6rem; align-items: flex-start; margin: 1rem 0 1.2rem; font-size: .92rem; color: var(--parchment-dim); cursor: pointer; }
+  .opt input { width: 1.2rem; height: 1.2rem; margin-top: .15rem; flex: 0 0 auto; accent-color: var(--brass); }
 
   .sr {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

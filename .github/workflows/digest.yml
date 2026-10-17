@@ -1,0 +1,26 @@
+name: Box office digest
+
+# The morning email: yesterday's sales, soft stops ahead, parishes still owed,
+# waitlists, low stock. The Worker composes and sends it; this is only the
+# alarm clock. The admin bearer token is the same one that guards /api/stats.
+#
+# 12:45 UTC is 7:45am Central in summer and 6:45am in winter — before the
+# day's first phone call either way.
+
+on:
+  schedule:
+    - cron: '45 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    name: Send the digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: Ask the Worker to send it
+        run: |
+          curl -fsS -X POST https://4estfilms.studio/api/admin/boxoffice/digest \
+            -H "authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
+            -H "content-type: application/json"

@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getEvent, quote } from '../../../lib/boxoffice-db';
-import { stripeKey, type BasketLine } from '../../../lib/boxoffice';
+import { stripeKey, taxConfig, type BasketLine } from '../../../lib/boxoffice';
 
 export const prerender = false;
 
@@ -21,7 +21,7 @@ const json = (b: unknown, status = 200) =>
   });
 
 export const POST: APIRoute = async ({ request, url }) => {
-  let body: { slug?: string; basket?: BasketLine[]; promo?: string; email?: string };
+  let body: { slug?: string; basket?: BasketLine[]; promo?: string; email?: string; subscribe?: boolean };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -66,6 +66,13 @@ export const POST: APIRoute = async ({ request, url }) => {
   form.set('custom_fields[0][optional]', 'false');
 
   if (body.email) form.set('customer_email', String(body.email).slice(0, 254));
+  // The buyer ticked "keep me posted". The webhook does the subscribing, so
+  // an abandoned checkout never puts anybody on a list.
+  if (body.subscribe === true) form.set('metadata[subscribe]', '1');
+
+  const tax = taxConfig();
+  if (tax.enabled) form.set('automatic_tax[enabled]', 'true');
+
   if (promo) {
     form.set('metadata[promo_code]', promo.code);
     form.set('metadata[promo_partner]', promo.partner.slice(0, 90));
@@ -90,6 +97,15 @@ export const POST: APIRoute = async ({ request, url }) => {
       `${event.venue}, ${event.city} — ${event.starts_at.slice(0, 10)}`
     );
     form.set(`line_items[${i}][quantity]`, String(l.qty));
+    if (tax.enabled) {
+      // Tax on top of the price, not inside it, so a $15 ticket is a $15
+      // ticket in every state and the report's gross means one thing.
+      form.set(`line_items[${i}][price_data][tax_behavior]`, 'exclusive');
+      form.set(
+        `line_items[${i}][price_data][product_data][tax_code]`,
+        l.kind === 'merch' ? tax.merch : tax.ticket
+      );
+    }
   });
 
   // A percentage code is applied as a Stripe coupon so the buyer sees the
