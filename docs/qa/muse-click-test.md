@@ -96,8 +96,9 @@ Rules:
 ### Part 4 — The door (phone)
 
 14. Open https://4estfilms.studio/boxoffice/door/tabor-czech-hall/ in a fresh
-    private window (so you are not signed in). You should be asked for a
-    **Door PIN**, not sent to a sign-in page.
+    private window (so you are not signed in — an admin session opens every
+    door without a PIN, so do all of Part 4 in this private window). You
+    should be asked for a **Door PIN**, not sent to a sign-in page.
 15. Enter `0000`. You should see "That's not the PIN for this door."
 16. Enter `DOOR_PIN`. The door should open: a venue name, three counters
     (**In / Sold / House**), tabs **Scan / Will-call / Sell**, and near the
@@ -106,10 +107,10 @@ Rules:
     tap elsewhere.
 18. In the **Or type the code** box, type `ZZZZZZZZZZ` and tap **Check in**.
     You should see "not on this list".
-19. (Only if you bought tickets in Part 1 — and note those were for Omaha,
-    not Tabor.) Open https://4estfilms.studio/boxoffice/door/omaha-orpheum/ .
-    It should ask for a PIN again (a Tabor PIN does not open Omaha). PASS if
-    it asks. Don't try to get in.
+19. In the same private window, open
+    https://4estfilms.studio/boxoffice/door/omaha-orpheum/ . It should ask for
+    a PIN again (a Tabor PIN does not open Omaha). PASS if it asks. Don't try
+    to get in. Come back to the Tabor door afterwards.
 20. Back on the Tabor door, tap **Sell**. Tap **+** on **Family package** and
     **+** on **T-shirt**. The cash button should stay disabled until you pick
     a shirt size. Pick **L**. The button should read **Take $75.00 cash**.
@@ -151,8 +152,11 @@ Rules:
 31. Under **Settling up**, record a payment: What = **Offering to the
     parish**, Amount `1.00`, How `QA test`. After saving, the money table's
     **Still due to the parish** should be exactly $1.00 less than **To the
-    parish** showed before. Then click **Remove** on that payment and confirm
-    the figure goes back.
+    parish** showed before (if that was $0.00 it will read **Overpaid
+    $1.00**). Then click **Remove** on that payment: a small box opens *in the
+    page* asking "Remove this $1.00 offering payment?" — click **Yes,
+    remove**. The row disappears and the figure goes back. There is no pop-up
+    dialog anywhere in this admin; if you ever see one, that is a FAIL.
 32. Under **Comps**, issue **1** seat to name `Quinn Comp`, your QA email, why
     `click test`. You should see "Comps issued." and, in Orders, a row for
     Quinn Comp at $0.00. Check the QA mailbox: a ticket email with one code.
@@ -164,9 +168,10 @@ Rules:
 34. Click **Settlement statement (print)**. A white page should open with the
     venue, a takings table, and a **Balance due to the parish** line.
 35. Click **Offering sign (print)** — the same white sign as step 13.
-36. Click **Refund** on the **Offline Quinn** cash order (the one you made)
-    and confirm. You should see "Refunded; tickets voided and stock
-    returned." and the row greyed out with "refunded".
+36. Click **Refund** on the **Offline Quinn** cash order (the one you made).
+    A box opens in the row: "Refund $75.00 and void 4 tickets? This cannot be
+    undone." Click **Yes, refund**. You should see "Refunded; tickets voided
+    and stock returned." and the row greyed out with "refunded".
 37. Go back to the door (Part 4 window) and tap **Refresh list**, then type
     the first offline code again. You must see "refunded, do not admit".
 38. On the admin **Box office** page click **Send the digest now**. The text

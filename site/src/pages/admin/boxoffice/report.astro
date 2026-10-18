@@ -95,7 +95,10 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
     <div class="key">
       <p class="label">Door PIN</p>
       <p class="key__big num">{event.door_pin ?? '—'}</p>
-      <p class="muted small">Opens <span class="num">{SITE}/boxoffice/door/{event.slug}/</span> and nothing else. Give it to whoever runs the door.</p>
+      <p class="muted small">
+        Opens <span class="num">{SITE}/boxoffice/door/{event.slug}/</span> and nothing else. Give it to whoever runs the door.
+        You’re signed in as admin, so every door opens for you without it — to see the gate, open the door in a private window.
+      </p>
       <form method="post" action="/api/admin/boxoffice/event" class="inline">
         <input type="hidden" name="action" value="door_pin" />
         <input type="hidden" name="slug" value={event.slug} />
@@ -110,11 +113,16 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
       {event.host_token
         ? <p class="num small"><a href={`/boxoffice/host/${event.host_token}/`} target="_blank" rel="noopener">{SITE}/boxoffice/host/{event.host_token}/</a></p>
         : <p class="muted small">None yet — save the stop once.</p>}
-      <form method="post" action="/api/admin/boxoffice/event" class="inline"
-            onsubmit="return confirm('The old link will stop working. Continue?')">
+      <form method="post" action="/api/admin/boxoffice/event" class="inline">
         <input type="hidden" name="action" value="host_token" />
         <input type="hidden" name="slug" value={event.slug} />
-        <button type="submit" class="quiet">New link</button>
+        <details class="sure">
+          <summary class="quiet">New link</summary>
+          <div class="sure__box">
+            <p>The old link stops working the moment this lands.</p>
+            <button type="submit" class="refund refund--yes">Yes, new link</button>
+          </div>
+        </details>
       </form>
     </div>
   </div>
@@ -249,11 +257,17 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
             <td>{p.method ?? '—'}</td>
             <td class="right num">{money(p.amount_cents)}</td>
             <td class="right">
-              <form method="post" action="/api/admin/boxoffice/settle" onsubmit="return confirm('Remove this payment record?')">
+              <form method="post" action="/api/admin/boxoffice/settle">
                 <input type="hidden" name="action" value="delete" />
                 <input type="hidden" name="slug" value={event.slug} />
                 <input type="hidden" name="id" value={String(p.id)} />
-                <button class="refund" type="submit">Remove</button>
+                <details class="sure">
+                  <summary class="refund">Remove</summary>
+                  <div class="sure__box">
+                    <p>Remove this {money(p.amount_cents)} {p.kind} payment from the record?</p>
+                    <button class="refund refund--yes" type="submit">Yes, remove</button>
+                  </div>
+                </details>
               </form>
             </td>
           </tr>
@@ -313,12 +327,17 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
                     <input name="reference" placeholder="cheque #" class="tiny" />
                     <button class="refund" type="submit">Mark paid</button>
                   </form>
-                  <form method="post" action="/api/admin/boxoffice/invoice" class="inline"
-                        onsubmit="return confirm('Cancel this invoice and release its seats?')">
+                  <form method="post" action="/api/admin/boxoffice/invoice" class="inline">
                     <input type="hidden" name="action" value="cancel" />
                     <input type="hidden" name="slug" value={event.slug} />
                     <input type="hidden" name="order_id" value={String(i.id)} />
-                    <button class="refund" type="submit">Cancel</button>
+                    <details class="sure">
+                      <summary class="refund">Cancel</summary>
+                      <div class="sure__box">
+                        <p>Cancel this invoice and release its {i.reserved_admits} seats?</p>
+                        <button class="refund refund--yes" type="submit">Yes, cancel it</button>
+                      </div>
+                    </details>
                   </form>
                 </>
               )}
@@ -351,7 +370,13 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
       <input name="subject" value={`Thank you for coming — ${event.venue}`} required />
       <textarea name="message" rows="6">{postShow}</textarea>
       <p class="muted small">Ends with a button to the offering page. Sends to each address once.</p>
-      <button type="submit" onclick="return confirm('Send to every ticket holder at this stop?')">Send to ticket holders</button>
+      <details class="sure">
+        <summary class="go">Send to ticket holders</summary>
+        <div class="sure__box">
+          <p>Send this to every ticket holder at {event.venue}, once each?</p>
+          <button type="submit">Yes, send it</button>
+        </div>
+      </details>
     </form>
     <form class="msg" method="post" action="/api/admin/boxoffice/notify">
       <input type="hidden" name="slug" value={event.slug} />
@@ -360,8 +385,17 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
       <input name="subject" value={`Seats opened at ${event.venue}`} required />
       <textarea name="message" rows="6">{`You asked to hear if seats opened at ${event.venue}. They have — the link below takes you straight to them.`}</textarea>
       <p class="muted small">Ends with a button to the ticket page. Each person is written to once.</p>
-      <button type="submit" disabled={!openWaitlist.length}
-              onclick="return confirm('Send to everyone on the waitlist?')">Send to the waitlist</button>
+      {openWaitlist.length ? (
+        <details class="sure">
+          <summary class="go">Send to the waitlist</summary>
+          <div class="sure__box">
+            <p>Send this to the {openWaitlist.length} {openWaitlist.length === 1 ? 'person' : 'people'} waiting?</p>
+            <button type="submit">Yes, send it</button>
+          </div>
+        </details>
+      ) : (
+        <button type="submit" disabled>Send to the waitlist</button>
+      )}
     </form>
   </div>
 
@@ -406,11 +440,16 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
               {o.status === 'refunded'
                 ? <span class="muted">refunded</span>
                 : (
-                  <form method="post" action="/api/admin/boxoffice/refund"
-                        onsubmit="return confirm('Refund this order and void its tickets? This cannot be undone.')">
+                  <form method="post" action="/api/admin/boxoffice/refund">
                     <input type="hidden" name="order_id" value={String(o.id)} />
                     <input type="hidden" name="slug" value={event.slug} />
-                    <button class="refund" type="submit">Refund</button>
+                    <details class="sure">
+                      <summary class="refund">Refund</summary>
+                      <div class="sure__box">
+                        <p>Refund {money(Number(o.total_cents))} and void {String(o.seats)} {Number(o.seats) === 1 ? 'ticket' : 'tickets'}? This cannot be undone.</p>
+                        <button class="refund refund--yes" type="submit">Yes, refund</button>
+                      </div>
+                    </details>
                   </form>
                 )}
             </td>
@@ -472,4 +511,22 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
   .tiny { width: 7rem; font-size: .78rem; padding: .3rem .5rem; }
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; margin-bottom: 1.6rem; }
   .msg { border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.2rem; display: grid; gap: .6rem; }
+
+  /* Two steps, no dialog. A native confirm() is invisible to a browser agent
+     and awkward for a screen reader; a <details> is just the page, and it
+     works with JavaScript off. The question sits next to the button. */
+  .sure { display: inline-block; }
+  .sure > summary { list-style: none; display: inline-block; cursor: pointer; }
+  .sure > summary::-webkit-details-marker { display: none; }
+  .sure[open] > summary { opacity: .55; }
+  .sure__box {
+    margin-top: .4rem; padding: .6rem .8rem; border: 1px solid #7a2630; border-radius: 3px;
+    background: var(--ink-2); max-width: 22rem; text-align: left;
+  }
+  .sure__box p { margin: 0 0 .5rem; font-size: .85rem; }
+  .refund--yes { border-color: #7a2630; color: #e08a8a; }
+  .msg .sure > summary.go, .sure > summary.go {
+    background: var(--blood); border: 0; border-radius: 3px; color: #fff;
+    font: inherit; font-weight: 600; padding: .55rem 1rem;
+  }
 </style>

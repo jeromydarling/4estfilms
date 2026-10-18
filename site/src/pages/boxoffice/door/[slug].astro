@@ -387,6 +387,8 @@ if (document.querySelector('[data-door]')) {
     await put('queue', { type: 'checkin', id: uuid(), code, at, by: who() });
     paintCounts();
     await paintQueue();
+    // The will-call list shows "admit N" per party; a scan changes N.
+    renderRows($as<HTMLInputElement>('[data-search]').value);
     say(v, 'ok', `${t.label ?? 'Admit'} — in`);
     if (navigator.vibrate) navigator.vibrate(40);
     void sync();
@@ -505,9 +507,16 @@ if (document.querySelector('[data-door]')) {
   function renderSell() {
     const box = $('[data-sellpicks]');
     if (!manifest) return;
-    box.innerHTML = manifest.catalogue
-      .map(
-        (p) => `<div class="pick" data-sku="${p.sku}">
+    // Seats first, then a rule and the merch on its own, so "T-shirt" is not
+    // lost among "Ticket + t-shirt" and its cousins.
+    const seats = manifest.catalogue.filter((p) => p.kind !== 'merch');
+    const merch = manifest.catalogue.filter((p) => p.kind === 'merch');
+    const group = (title: string, items: Item[]) =>
+      items.length ? `<p class="pick__group">${title}</p>` + items.map(card).join('') : '';
+    box.innerHTML = group('Seats', seats) + group('Merch only — no seat', merch);
+  }
+
+  const card = (p: Item) => `<div class="pick" data-sku="${p.sku}">
           <span class="pick__head">
             <span class="pick__name">${esc(p.name)}</span>
             <span class="pick__price">${money(p.price_cents)}</span>
@@ -518,10 +527,7 @@ if (document.querySelector('[data-door]')) {
             <button type="button" class="step" data-step="1">+</button>
           </span>
           ${p.needs_size ? `<span class="sizes">${SIZES.map((s) => `<button type="button" class="size" data-sizepick="${s}">${s}</button>`).join('')}</span>` : ''}
-        </div>`
-      )
-      .join('');
-  }
+        </div>`;
 
   function sellTotal() {
     if (!manifest) return 0;
@@ -609,6 +615,7 @@ if (document.querySelector('[data-door]')) {
     renderSell();
     paintSell();
     paintCounts();
+    renderRows($as<HTMLInputElement>('[data-search]').value);
     await paintQueue();
     $as<HTMLInputElement>('[data-sellname]').value = '';
     say($('[data-sellmsg]'), 'ok',
@@ -779,6 +786,10 @@ if (document.querySelector('[data-door]')) {
 -->
 <style is:global>
   .door .picks { display: grid; gap: .6rem; }
+  .door .pick__group {
+    font-family: var(--mono); font-size: .6rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--warm); margin: .6rem 0 -.2rem;
+  }
   .door .pick {
     border: 1px solid var(--rule); border-radius: 4px; padding: .8rem;
     background: var(--ground-2); display: grid; gap: .35rem;
