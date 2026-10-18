@@ -20,7 +20,23 @@ jobs:
     environment: production
     steps:
       - name: Ask the Worker to send it
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
-          curl -fsS -X POST https://4estfilms.studio/api/admin/boxoffice/digest \
-            -H "authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
-            -H "content-type: application/json"
+          # The secret is pasted by a person. Accept it with or without a
+          # "Bearer " in front and with a stray newline on the end; the Worker
+          # compares the bare token byte for byte.
+          token="$(printf '%s' "$ADMIN_TOKEN" | tr -d '[:space:]')"
+          token="${token#Bearer}"
+          token="${token#bearer}"
+          if [ -z "$token" ]; then echo "ADMIN_TOKEN is empty in the production environment" >&2; exit 1; fi
+          status="$(curl -sS -o /tmp/digest.json -w '%{http_code}' -X POST \
+            https://4estfilms.studio/api/admin/boxoffice/digest \
+            -H "authorization: Bearer $token" \
+            -H "content-type: application/json")"
+          echo "Worker answered $status: $(cat /tmp/digest.json)"
+          case "$status" in
+            200) ;;
+            404) echo "The Worker refused the token: ADMIN_TOKEN here does not match the Worker's ADMIN_TOKEN secret." >&2; exit 1 ;;
+            *) exit 1 ;;
+          esac
