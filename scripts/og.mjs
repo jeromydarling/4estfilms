@@ -41,7 +41,7 @@ const CARDS = {
     tone: 'rgba(11,17,24,.55)',
     kicker: 'Coming Late 2026',
     title: 'His Name<br>is Michael',
-    sub: 'A supernatural Western musical, set in Virginia City, Nevada',
+    sub: 'A supernatural sci-fi Western, set in Virginia City, Nevada',
   },
   strung: {
     // Full bleed and cropped tight, on purpose — and note this is the

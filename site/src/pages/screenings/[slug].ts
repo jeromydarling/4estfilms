@@ -93,7 +93,7 @@ export const GET: APIRoute = async ({ params }) => {
 
 Hello,
 
-I'm writing to ask whether you would consider a one-night screening of an independent feature called His Name is Michael — a supernatural Western musical from 4est Films, set in Virginia City, Nevada and filmed entirely in South Dakota.
+I'm writing to ask whether you would consider a one-night screening of an independent feature called His Name is Michael — a supernatural sci-fi Western from 4est Films, set in Virginia City, Nevada and filmed entirely in South Dakota.
 
 ${demand}
 

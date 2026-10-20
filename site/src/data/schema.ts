@@ -64,7 +64,7 @@ export const hnimSchema = {
   name: hnim.title,
   url: `${SITE}/films/${hnim.slug}/`,
   image: `${SITE}/og/hnim.jpg`,
-  genre: ['Western', 'Musical', 'Fantasy'],
+  genre: ['Sci-Fi', 'Western', 'Fantasy'],
   inLanguage: 'en',
   description: hnim.description,
   abstract: hnim.logline,

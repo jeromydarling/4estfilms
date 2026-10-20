@@ -163,7 +163,7 @@ export function welcomeEmail(token: string, name?: string | null) {
       body: `<p style="margin:0 0 14px;">You’ll hear from us when there is something real
              to say — a trailer, a date, a screening. Not otherwise.</p>
              <p style="margin:0 0 14px;"><em>His Name is Michael</em> is a supernatural
-             Western musical set in Virginia City, Nevada, and filmed entirely in South
+             sci-fi Western set in Virginia City, Nevada, and filmed entirely in South
              Dakota. It arrives late 2026.</p>
              <p style="margin:0;">Before it, there was <em>Strung</em> — twelve awards
              across eight festivals, and a premiere that raised money for people who

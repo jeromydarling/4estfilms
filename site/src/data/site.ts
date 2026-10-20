@@ -90,14 +90,14 @@ export const hnim = {
   title: 'His Name is Michael',
   release: 'Coming Late 2026',
   instagram: 'https://instagram.com/hnimfilm',
-  genre: 'Western · Musical · Supernatural',
+  genre: 'Sci-Fi · Western · Supernatural',
   youtube: null as string | null,
   logline:
     'The only priest in Nevada battles demons and outlaws for the soul of a boy with no name.',
   // Set in Nevada, shot in South Dakota. The distinction is the director's and
   // must hold everywhere the film is described.
   description:
-    'A supernatural Western musical set in Virginia City, Nevada, and filmed entirely in South Dakota.',
+    'A supernatural sci-fi Western set in Virginia City, Nevada, and filmed entirely in South Dakota.',
   setting: 'Virginia City, Nevada',
   shotIn: 'Filmed entirely in South Dakota',
   question: 'What is your name?',
@@ -161,7 +161,7 @@ export const hnim = {
     {
       title: 'The barn',
       plates: ['day4_DSC03681-Enhanced-NR.webp', 'day4_DSC03636.webp', 'day7_DSC04476.webp'],
-      text: 'From that classroom the picture turns: a presence in a barn that should not be there. The tonal distance between those two sequences is the film in miniature — and the reason it needed a musical to hold it together.',
+      text: 'From that classroom the picture turns: a presence in a barn that should not be there. The tonal distance between those two sequences is the film in miniature — and the reason it needed its music to hold it together.',
     },
     {
       title: 'The river',
