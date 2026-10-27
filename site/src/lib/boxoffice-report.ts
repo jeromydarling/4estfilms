@@ -20,6 +20,13 @@ export interface StopTotals extends StopReport {
   orders: number;
   door_orders: number;
   cash_cents: number;
+  /** Sponsor a Family: the pool for this screening. */
+  partner_name: string | null;
+  partner_confirmed: boolean;
+  sponsored_seats: number;
+  sponsor_orders: number;
+  sponsor_claimed: number;
+  sponsor_released: number;
 }
 
 /** One row per stop, with the money already resolved. */
@@ -49,8 +56,15 @@ export async function stopTotals(eventId?: number): Promise<StopTotals[]> {
               COALESCE(t.comp_seats, 0)   AS comp_seats,
               COALESCE(s.tithe, 0)        AS tithe_paid_cents,
               COALESCE(s.offering, 0)     AS offering_paid_cents,
-              COALESCE(s.rental, 0)       AS rental_paid_cents
+              COALESCE(s.rental, 0)       AS rental_paid_cents,
+              e.partner_name, e.partner_confirmed, e.sponsor_claimed, e.sponsor_released,
+              COALESCE(sp.seats, 0)       AS sponsored_seats,
+              COALESCE(sp.orders, 0)      AS sponsor_orders
          FROM bo_events e
+         LEFT JOIN (
+           SELECT sponsor_stop_id AS event_id, SUM(sponsor_seats) AS seats, COUNT(*) AS orders
+             FROM bo_orders WHERE status = 'paid' AND sponsor_seats > 0 GROUP BY sponsor_stop_id
+         ) sp ON sp.event_id = e.id
          LEFT JOIN (
            SELECT event_id,
                   SUM(CASE WHEN status <> 'cancelled' THEN 1 ELSE 0 END) AS orders,
@@ -103,6 +117,12 @@ export async function stopTotals(eventId?: number): Promise<StopTotals[]> {
     orders: Number(r.orders),
     door_orders: Number(r.door_orders),
     cash_cents: Number(r.cash_cents),
+    partner_name: (r.partner_name as string | null) ?? null,
+    partner_confirmed: Number(r.partner_confirmed) === 1,
+    sponsored_seats: Number(r.sponsored_seats),
+    sponsor_orders: Number(r.sponsor_orders),
+    sponsor_claimed: Number(r.sponsor_claimed),
+    sponsor_released: Number(r.sponsor_released),
     ...stopReport({
       gross_cents: Number(r.gross_cents),
       discount_cents: Number(r.discount_cents),
@@ -344,5 +364,32 @@ export async function invoicesAt(eventId: number): Promise<InvoiceLine[]> {
     )
     .bind(eventId)
     .all<InvoiceLine>();
+  return r.results ?? [];
+}
+
+export interface SponsorshipLine {
+  id: number;
+  buyer_name: string | null;
+  buyer_email: string | null;
+  sponsor_tier: string;
+  sponsor_qty: number;
+  sponsor_seats: number;
+  created_at: string;
+  /** The stop the tickets on the same order were for, when it differs. */
+  bought_at: string;
+}
+
+/** Every paid sponsorship bound to a stop, newest first. */
+export async function sponsorshipsAt(eventId: number): Promise<SponsorshipLine[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT o.id, o.buyer_name, o.buyer_email, o.sponsor_tier, o.sponsor_qty, o.sponsor_seats,
+              o.created_at, e.slug AS bought_at
+         FROM bo_orders o JOIN bo_events e ON e.id = o.event_id
+        WHERE o.sponsor_stop_id = ?1 AND o.sponsor_seats > 0 AND o.status = 'paid'
+        ORDER BY o.created_at DESC`
+    )
+    .bind(eventId)
+    .all<SponsorshipLine>();
   return r.results ?? [];
 }

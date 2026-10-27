@@ -1,12 +1,15 @@
 import { env } from 'cloudflare:workers';
 import {
+  SPONSOR,
   newTicketCode,
   parseConsumes,
   priceBasket,
+  sponsorTier,
   type BasketLine,
   type EventRow,
   type PricedLine,
   type Product,
+  type SponsorTier,
 } from './boxoffice';
 
 /**
@@ -83,6 +86,78 @@ export async function soldAdmits(eventId: number): Promise<number> {
   return r?.n ?? 0;
 }
 
+/** Sponsored seats bought for a stop, from paid orders only: a refund frees them. */
+export async function sponsoredSeats(eventId: number): Promise<number> {
+  const r = await db()
+    .prepare(
+      `SELECT COALESCE(SUM(sponsor_seats), 0) AS n FROM bo_orders
+        WHERE sponsor_stop_id = ?1 AND status = 'paid'`
+    )
+    .bind(eventId)
+    .first<{ n: number }>();
+  return r?.n ?? 0;
+}
+
+/** What the browser says about sponsoring: a tier, how many, and which stop. */
+export interface SponsorPick {
+  tier?: string | null;
+  qty?: number | null;
+  stop?: string | null;
+}
+
+export interface SponsorQuote {
+  tier: SponsorTier;
+  qty: number;
+  seats: number;
+  cents: number;
+  stop: EventRow;
+  /** Sponsored seats still open at that stop after this one. */
+  left: number;
+}
+
+/**
+ * Price a sponsorship and check it against the stop's pool.
+ *
+ * Bound to the stop being bought unless the buyer chose another upcoming
+ * one. The Whole Block needs a confirmed partner at *that* stop, and nothing
+ * may take a stop past the cap — a house cannot place sponsored seats it
+ * does not have.
+ */
+export async function sponsorQuote(
+  pick: SponsorPick | null | undefined,
+  here: EventRow
+): Promise<{ ok: true; sponsor: SponsorQuote | null } | { ok: false; error: string }> {
+  if (!pick || !pick.tier || pick.tier === 'none') return { ok: true, sponsor: null };
+
+  const tier = sponsorTier(pick.tier);
+  if (!tier) return { ok: false, error: 'That sponsorship isn’t offered.' };
+
+  const qty = Math.floor(Number(pick.qty ?? 1));
+  if (!Number.isFinite(qty) || qty < 1 || qty > SPONSOR.maxQty) {
+    return { ok: false, error: 'Choose how many families to sponsor.' };
+  }
+
+  const stop = pick.stop && pick.stop !== here.slug ? await getEvent(String(pick.stop)) : here;
+  if (!stop || stop.status !== 'on_sale') return { ok: false, error: 'That stop isn’t taking sponsorships.' };
+  if (tier.partnerOnly && !stop.partner_confirmed) {
+    return { ok: false, error: `${tier.name} needs a confirmed local partner at ${stop.venue}.` };
+  }
+
+  const seats = tier.seats * qty;
+  const open = SPONSOR.capPerStop - (await sponsoredSeats(stop.id));
+  if (seats > open) {
+    return {
+      ok: false,
+      error:
+        open <= 0
+          ? `Every sponsored seat at ${stop.venue} is covered — thank you. Try another stop.`
+          : `Only ${open} sponsored ${open === 1 ? 'seat is' : 'seats are'} left at ${stop.venue}.`,
+    };
+  }
+
+  return { ok: true, sponsor: { tier, qty, seats, cents: tier.cents * qty, stop, left: open - seats } };
+}
+
 /**
  * Mint tickets for an order that exists without any — a group invoice that
  * has just been paid. Same shape as the tickets recordOrder writes, so the
@@ -153,6 +228,8 @@ export interface RecordOrderInput {
   tax_cents?: number;
   /** Why a comp was issued, or anything else worth remembering. */
   note?: string | null;
+  /** Sponsor a Family, bound to a stop. Already priced and checked. */
+  sponsor?: { tier: SponsorTier; qty: number; seats: number; stop_id: number } | null;
   stripe_session_id?: string | null;
   stripe_payment_intent?: string | null;
   /** A door device's id for a sale it made offline. Makes replay safe. */
@@ -214,8 +291,9 @@ export async function recordOrder(input: RecordOrderInput): Promise<RecordedOrde
         `INSERT INTO bo_orders
            (event_id, stripe_session_id, stripe_payment_intent, offline_id,
             buyer_name, buyer_email, buyer_phone, subtotal_cents, discount_cents,
-            total_cents, fee_cents, promo_code, channel, operator, tax_cents, note)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)`
+            total_cents, fee_cents, promo_code, channel, operator, tax_cents, note,
+            sponsor_tier, sponsor_qty, sponsor_seats, sponsor_stop_id)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)`
       )
       .bind(
         input.event.id,
@@ -233,9 +311,26 @@ export async function recordOrder(input: RecordOrderInput): Promise<RecordedOrde
         input.channel,
         input.operator ?? null,
         input.tax_cents ?? 0,
-        input.note ?? null
+        input.note ?? null,
+        input.sponsor?.tier.id ?? null,
+        input.sponsor?.qty ?? 0,
+        input.sponsor?.seats ?? 0,
+        input.sponsor?.stop_id ?? null
       )
   );
+
+  // The sponsorship is a line on the order like anything else bought, so the
+  // report's "sold by type" and the CSVs see it without special pleading.
+  if (input.sponsor) {
+    stmts.push(
+      d
+        .prepare(
+          `INSERT INTO bo_order_items (order_id, sku, name, qty, unit_price_cents, size, admits)
+           VALUES (${orderIdSql}, 'sponsor', ?2, ?3, ?4, NULL, 0)`
+        )
+        .bind(key.val, `Sponsor a Family — ${input.sponsor.tier.name}`, input.sponsor.qty, input.sponsor.tier.cents)
+    );
+  }
 
   for (const l of input.lines) {
     stmts.push(
@@ -305,13 +400,17 @@ export type Quote =
       promo: PromoRow | null;
       sold: number;
       left: number;
+      /** Sponsor a Family, if chosen. Outside the promo: codes discount seats, not sponsorships. */
+      sponsor: SponsorQuote | null;
+      /** Tickets after the code, plus the sponsorship. What the card is charged. */
+      grand_total_cents: number;
     };
 
 export async function quote(
   event: EventRow,
   basket: BasketLine[],
   promoCode?: string | null,
-  opts: { door?: boolean } = {}
+  opts: { door?: boolean; sponsor?: SponsorPick | null } = {}
 ): Promise<Quote> {
   const [products, offered] = await Promise.all([getProducts(), getOffered(event.id)]);
   const { promo, error: promoError } = promoCode
@@ -339,5 +438,16 @@ export async function quote(
     };
   }
 
-  return { ok: true, priced, promo, sold, left };
+  const sp = await sponsorQuote(opts.sponsor, event);
+  if (!sp.ok) return { ok: false, error: sp.error };
+
+  return {
+    ok: true,
+    priced,
+    promo,
+    sold,
+    left,
+    sponsor: sp.sponsor,
+    grand_total_cents: priced.total_cents + (sp.sponsor?.cents ?? 0),
+  };
 }

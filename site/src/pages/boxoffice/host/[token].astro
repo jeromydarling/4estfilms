@@ -38,6 +38,13 @@ const past = event.starts_at.slice(0, 10) < new Date().toISOString().slice(0, 10
     <div class="count"><span class="count__n">{t.checked_in}</span><span class="count__l">walked in</span></div>
   </div>
 
+  {!!t.sponsored_seats && (
+    <p class="fine">
+      <strong>{t.sponsored_seats}</strong> seats sponsored for foster and adoptive families at this screening
+      {t.partner_name ? `, placed through ${t.partner_name}` : ''}.
+    </p>
+  )}
+
   <h2>Your codes</h2>
   <p class="fine">When your people buy with your code, we know they came through you.</p>
   {used.length ? (

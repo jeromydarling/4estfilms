@@ -42,7 +42,8 @@ export const GET: APIRoute = async ({ request, url }) => {
          'net', `tithe_${TOUR.tithePercent}pc`, 'offering_cash', 'offering_card_gifts',
          'offering_card', 'offering_card_fees', 'offering_passed', 'to_parish',
          'tithe_paid', 'offering_paid', 'parish_due', 'rental_paid', 'retained',
-         'comp_seats', 'reserved_unpaid', 'sales_tax', 'revenue_per_attendee'],
+         'comp_seats', 'reserved_unpaid', 'sales_tax', 'revenue_per_attendee',
+         'sponsor_partner', 'sponsor_partner_confirmed', 'seats_sponsored', 'seats_claimed', 'seats_released'],
         stops.map((s) => [
           s.leg ?? '', s.venue, s.city, s.region ?? '', s.starts_at, s.capacity,
           s.attendees, s.checked_in, s.orders, s.door_orders,
@@ -53,6 +54,8 @@ export const GET: APIRoute = async ({ request, url }) => {
           d(s.tithe_paid_cents), d(s.offering_paid_cents), d(s.parish_due_cents), d(s.rental_paid_cents),
           d(s.retained_cents), s.comp_seats, s.reserved_admits, d(s.tax_cents),
           d(s.revenue_per_attendee_cents),
+          s.partner_name ?? '', s.partner_confirmed ? 'yes' : 'no',
+          s.sponsored_seats, s.sponsor_claimed, s.sponsor_released,
         ])
       )
     );
@@ -107,6 +110,8 @@ export const GET: APIRoute = async ({ request, url }) => {
       ['Rental paid to the house', d(t.rental_paid_cents)], [],
       ['Sales tax collected (remitted)', d(t.tax_cents)],
       ['Comp seats', t.comp_seats], ['Seats held by unpaid invoices', t.reserved_admits], [],
+      ['Sponsor a Family partner', t.partner_name ?? ''], ['Partner confirmed', t.partner_confirmed ? 'yes' : 'no'],
+      ['Seats sponsored', t.sponsored_seats], ['Seats claimed', t.sponsor_claimed], ['Seats released', t.sponsor_released], [],
       ['Seats sold', t.attendees], ['Checked in', t.checked_in],
       ['Cash taken', d(t.cash_cents)], ['Revenue per attendee', d(t.revenue_per_attendee_cents)], [],
       ['Item', 'Units', 'Seats', 'Gross'],

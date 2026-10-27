@@ -3,9 +3,9 @@ import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
 import { getEvent } from '../../../lib/boxoffice-db';
 import {
-  invoicesAt, offeringsAt, salesByCode, settlementsAt, soldBySku, stopTotals, waitlistAt,
+  invoicesAt, offeringsAt, salesByCode, settlementsAt, soldBySku, sponsorshipsAt, stopTotals, waitlistAt,
 } from '../../../lib/boxoffice-report';
-import { TOUR, money, showTime } from '../../../lib/boxoffice';
+import { SPONSOR, TOUR, money, showTime, sponsorTier } from '../../../lib/boxoffice';
 import { SITE } from '../../../lib/email';
 import { env } from 'cloudflare:workers';
 
@@ -18,13 +18,14 @@ const event = await getEvent(slug);
 if (!event) return Astro.redirect('/admin/boxoffice/');
 
 const [totals] = await stopTotals(event.id);
-const [items, codes, gifts, invoices, payments, waitlist, orders] = await Promise.all([
+const [items, codes, gifts, invoices, payments, waitlist, sponsorships, orders] = await Promise.all([
   soldBySku(event.id),
   salesByCode(event.id),
   offeringsAt(event.id),
   invoicesAt(event.id),
   settlementsAt(event.id),
   waitlistAt(event.id),
+  sponsorshipsAt(event.id),
   env.DB
     .prepare(
       `SELECT o.id, o.buyer_name, o.buyer_email, o.channel, o.status, o.total_cents,
@@ -56,6 +57,7 @@ const flash = [
   q.get('settled') === 'done' && 'Payment recorded.',
   q.get('settled') === 'removed' && 'Payment removed.',
   q.get('settled') === 'bad' && 'A payment needs a kind and an amount.',
+  q.get('pool') === 'saved' && 'Sponsored-seat pool updated.',
   q.get('sent') && q.get('sent') !== 'empty' && `Sent to ${q.get('sent')} ${q.get('audience') === 'waitlist' ? 'on the waitlist' : 'ticket holders'}.`,
   q.get('sent') === 'empty' && 'A message needs a subject and some words.',
   q.get('refund') === 'done' && 'Refunded; tickets voided and stock returned.',
@@ -71,6 +73,8 @@ const postShow =
   `Tell someone in the next town.`;
 const unpaidInvoices = invoices.filter((i) => i.status === 'unpaid');
 const openWaitlist = waitlist.filter((w) => !w.notified_at);
+const poolOpen = Math.max(0, SPONSOR.capPerStop - totals.sponsored_seats);
+const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sponsor_released;
 ---
 
 <Admin title={`Report — ${event.venue}`}>
@@ -240,6 +244,55 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
               </tr>
             ))
           : <tr><td colspan="5" class="empty">No code has been used at this stop.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Sponsor a Family</h2>
+  <div class="keys">
+    <div class="key">
+      <p class="label">Local partner</p>
+      <p class="key__big key__text">{totals.partner_name ?? '—'}</p>
+      <p class="muted small">
+        {totals.partner_confirmed
+          ? 'Confirmed. All three tiers are offered here, including The Whole Block.'
+          : 'Not confirmed. One Family and Five Families are offered; The Whole Block is not.'}
+        {' '}<a href={`/admin/boxoffice/event/?slug=${event.slug}`}>Edit</a>
+      </p>
+    </div>
+    <div class="key">
+      <p class="label">The pool</p>
+      <table class="pool">
+        <tbody>
+          <tr><td>Seats sponsored</td><td class="right num">{totals.sponsored_seats} <span class="muted">of {SPONSOR.capPerStop}</span></td></tr>
+          <tr><td>Claimed by the partner</td><td class="right num">{totals.sponsor_claimed}</td></tr>
+          <tr><td>Released at showtime</td><td class="right num">{totals.sponsor_released}</td></tr>
+          <tr class="rule"><td>Still to place</td><td class={`right num ${poolUnplaced < 0 ? 'bad' : ''}`}>{poolUnplaced}</td></tr>
+          <tr><td>Open to sponsor</td><td class="right num">{poolOpen}</td></tr>
+        </tbody>
+      </table>
+      <form method="post" action="/api/admin/boxoffice/event" class="row poolform">
+        <input type="hidden" name="action" value="sponsor_pool" />
+        <input type="hidden" name="slug" value={event.slug} />
+        <label><span class="label">Claimed</span><input name="claimed" type="number" min="0" value={String(totals.sponsor_claimed)} /></label>
+        <label><span class="label">Released</span><input name="released" type="number" min="0" value={String(totals.sponsor_released)} /></label>
+        <button type="submit">Save</button>
+      </form>
+    </div>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>When</th><th>Sponsor</th><th>Tier</th><th class="right">Seats</th><th>Bought with</th></tr></thead>
+      <tbody>
+        {sponsorships.length ? sponsorships.map((sp) => (
+          <tr>
+            <td class="num">{sp.created_at.slice(0, 16).replace('T', ' ')}</td>
+            <td>{sp.buyer_name ?? '—'}<br /><span class="muted">{sp.buyer_email ?? ''}</span></td>
+            <td>{sponsorTier(sp.sponsor_tier)?.name ?? sp.sponsor_tier}{sp.sponsor_qty > 1 ? ` × ${sp.sponsor_qty}` : ''}</td>
+            <td class="right num">{sp.sponsor_seats}</td>
+            <td class="num">{sp.bought_at === event.slug ? 'this stop' : sp.bought_at}</td>
+          </tr>
+        )) : <tr><td colspan="5" class="empty">No sponsored seats yet.</td></tr>}
       </tbody>
     </table>
   </div>
@@ -488,6 +541,12 @@ const openWaitlist = waitlist.filter((w) => !w.notified_at);
   .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
   .key { border: 1px solid var(--rule); border-radius: 4px; padding: 1rem 1.2rem; }
   .key__big { font-size: 2.2rem; letter-spacing: .2em; margin: .2rem 0 .4rem; }
+  .key__text { font-size: 1.3rem; letter-spacing: 0; }
+  .pool { width: 100%; border-collapse: collapse; margin: .3rem 0 .6rem; }
+  .pool td { padding: .3rem 0; border-bottom: 1px solid var(--rule); font-size: .9rem; }
+  .pool .rule td { border-top: 2px solid var(--rule); font-weight: 600; }
+  .poolform { margin: .4rem 0 0; }
+  .poolform input { width: 6rem; }
   .key .small a { word-break: break-all; }
   .inline { display: inline-flex; gap: .4rem; align-items: center; margin: .4rem .4rem 0 0; }
   .quiet {

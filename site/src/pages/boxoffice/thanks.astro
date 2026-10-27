@@ -1,6 +1,8 @@
 ---
 import BoxOffice from '../../layouts/BoxOffice.astro';
 import { env } from 'cloudflare:workers';
+import { sponsorTier } from '../../lib/boxoffice';
+import { sponsorLine } from '../../lib/boxoffice-webhook';
 
 export const prerender = false;
 
@@ -16,12 +18,23 @@ export const prerender = false;
  */
 const session = (Astro.url.searchParams.get('session') ?? '').slice(0, 120);
 let found = false;
+// The one specific thing this page does say: the sponsorship, read from the
+// order the webhook wrote — seats and city, nothing about the family.
+let sponsored: string | null = null;
 if (/^cs_[A-Za-z0-9_]+$/.test(session) && env.DB) {
   const row = await env.DB
-    .prepare(`SELECT id FROM bo_orders WHERE stripe_session_id = ?1`)
+    .prepare(
+      `SELECT o.id, o.sponsor_tier, o.sponsor_qty, o.sponsor_seats, e.city
+         FROM bo_orders o LEFT JOIN bo_events e ON e.id = o.sponsor_stop_id
+        WHERE o.stripe_session_id = ?1`
+    )
     .bind(session)
-    .first<{ id: number }>();
+    .first<{ id: number; sponsor_tier: string | null; sponsor_qty: number; sponsor_seats: number; city: string | null }>();
   found = Boolean(row);
+  const tier = row?.sponsor_tier ? sponsorTier(row.sponsor_tier) : null;
+  if (row && tier && row.sponsor_seats > 0) {
+    sponsored = sponsorLine(tier, row.sponsor_qty, row.sponsor_seats, row.city ?? 'that city');
+  }
 }
 ---
 
@@ -40,6 +53,8 @@ if (/^cs_[A-Za-z0-9_]+$/.test(session) && env.DB) {
       minute or two. You don’t need to stay on this page.
     </p>
   )}
+
+  {sponsored && <p class="note note--good">{sponsored} Thank you.</p>}
 
   <p class="dim">
     If nothing arrives, check the spam folder first, then write to
