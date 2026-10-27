@@ -72,6 +72,46 @@ export interface EventRow {
   host_token: string | null;
   /** Seats kept off the web. The door can still sell them. */
   holds: number;
+  /** The local partner who places sponsored seats with families. */
+  partner_name: string | null;
+  partner_confirmed: number;
+  /** Sponsored seats the partner has placed, and the unclaimed ones let go at showtime. */
+  sponsor_claimed: number;
+  sponsor_released: number;
+}
+
+/**
+ * Sponsor a Family.
+ *
+ * Seats bought for foster and adoptive families and handed to a local
+ * partner to place, anonymously. A purchase of seats for distribution, not
+ * a donation — nothing here or anywhere else calls it tax-deductible. The
+ * checkout copy is the headline and the one line below and nothing more;
+ * the rest lives in the one-pager.
+ */
+export const SPONSOR = {
+  headline: 'Sponsor a Family',
+  line: 'Send a foster or adoptive family to this screening — free for them, covered by you.',
+  tiers: [
+    { id: 'one', name: 'One Family', cents: 6000, seats: 4, partnerOnly: false },
+    { id: 'five', name: 'Five Families', cents: 30000, seats: 20, partnerOnly: false },
+    /** Only where a local partner is confirmed to place fifty seats. */
+    { id: 'block', name: 'The Whole Block', cents: 75000, seats: 50, partnerOnly: true },
+  ],
+  /** Sponsored seats per screening. Beyond this a house cannot place them. */
+  capPerStop: 50,
+  maxQty: 12,
+} as const;
+
+export type SponsorTier = (typeof SPONSOR.tiers)[number];
+export const sponsorTier = (id: unknown): SponsorTier | null =>
+  SPONSOR.tiers.find((t) => t.id === String(id)) ?? null;
+
+/** "a foster or adoptive family" / "3 foster or adoptive families" — for the thank-you. */
+export function sponsorFamilies(tier: SponsorTier, qty: number): string {
+  if (tier.id === 'block') return 'foster and adoptive families across the house';
+  const families = tier.id === 'five' ? 5 * qty : qty;
+  return families === 1 ? 'a foster or adoptive family' : `${families} foster or adoptive families`;
 }
 
 /**

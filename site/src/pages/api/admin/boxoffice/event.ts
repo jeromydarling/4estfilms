@@ -49,6 +49,20 @@ export const POST: APIRoute = async ({ request, url }) => {
     return back(`/admin/boxoffice/report/?slug=${encodeURIComponent(slug)}`);
   }
 
+  // The sponsored-seat pool, after the partner reports and after the night:
+  // how many seats were placed with families, how many went to the general
+  // audience at showtime.
+  if (action === 'sponsor_pool') {
+    const slug = str('slug');
+    if (!slug) return back('/admin/boxoffice/');
+    const n = (k: string) => Math.max(0, Math.min(1000, Math.floor(Number(f.get(k)) || 0)));
+    await db
+      .prepare(`UPDATE bo_events SET sponsor_claimed = ?1, sponsor_released = ?2 WHERE slug = ?3`)
+      .bind(n('claimed'), n('released'), slug)
+      .run();
+    return back(`/admin/boxoffice/report/?slug=${encodeURIComponent(slug)}&pool=saved`);
+  }
+
   // A new PIN or host link, when the old one has been shared too widely.
   // The old one stops working the moment this lands.
   if (action === 'door_pin' || action === 'host_token') {
@@ -90,6 +104,8 @@ export const POST: APIRoute = async ({ request, url }) => {
       ? String(f.get('status'))
       : 'draft',
     notes: str('notes', 2000),
+    partner_name: str('partner_name', 160),
+    partner_confirmed: f.get('partner_confirmed') ? 1 : 0,
   };
 
   if (!fields.venue || !fields.city || !fields.starts_at) {
@@ -107,27 +123,30 @@ export const POST: APIRoute = async ({ request, url }) => {
                 doors_at=?7, capacity=?8, blurb=?9, poster=?10, rental_cents=?11, leg=?12,
                 status=?13, notes=?14, holds=?16,
                 door_pin = COALESCE(NULLIF(?17, ''), door_pin, ?18),
-                host_token = COALESCE(host_token, ?19)
+                host_token = COALESCE(host_token, ?19),
+                partner_name=?20, partner_confirmed=?21
           WHERE id=?15`
       )
       .bind(
         fields.slug, fields.title, fields.venue, fields.city, fields.region, fields.starts_at,
         fields.doors_at, fields.capacity, fields.blurb, fields.poster, fields.rental_cents,
         fields.leg, fields.status, fields.notes, existing.id,
-        holds, pinIn, newPin(), newHostToken()
+        holds, pinIn, newPin(), newHostToken(), fields.partner_name, fields.partner_confirmed
       )
       .run();
   } else {
     await db
       .prepare(
         `INSERT INTO bo_events (slug,title,venue,city,region,starts_at,doors_at,capacity,
-                                blurb,poster,rental_cents,leg,status,notes,holds,door_pin,host_token)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)`
+                                blurb,poster,rental_cents,leg,status,notes,holds,door_pin,host_token,
+                                partner_name,partner_confirmed)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)`
       )
       .bind(
         fields.slug, fields.title, fields.venue, fields.city, fields.region, fields.starts_at,
         fields.doors_at, fields.capacity, fields.blurb, fields.poster, fields.rental_cents,
-        fields.leg, fields.status, fields.notes, holds, pinIn || newPin(), newHostToken()
+        fields.leg, fields.status, fields.notes, holds, pinIn || newPin(), newHostToken(),
+        fields.partner_name, fields.partner_confirmed
       )
       .run();
   }

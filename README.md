@@ -105,6 +105,28 @@ Everything below lives on a stop's report page (`/admin/boxoffice/report/?slug=`
 | **The morning after** | "Send to ticket holders" — a prefilled thank-you with the offering link, one per address. |
 | **Device names** | Each door phone names itself once ("Door A"); check-ins carry it, so a double scan can be traced. Doors refresh from the server every half minute while online, so a seat scanned on one phone shows on the next. |
 
+### Sponsor a Family
+
+An optional add-on on every stop page, after the tickets and before payment:
+One Family ($60, 4 seats), Five Families ($300, 20 seats), and — only where the
+stop's local partner is confirmed — The Whole Block ($750, 50 seats), each with
+a quantity. Skipping it is the default and takes no action. A sponsorship is
+bound to the stop being bought unless the buyer picks another upcoming one
+("sponsor in a different city"). It is one more line on the same Stripe
+payment, with `sponsor_tier`, `sponsor_qty`, `sponsor_seats` and
+`sponsor_stop_id` on the session, on the payment intent, and on the order;
+the webhook adds `buyer_email` to the payment once Checkout has it.
+
+The pool per screening is on the report: seats sponsored (summed from paid
+orders, so a refund gives them back), claimed by the partner, released at
+showtime, and what is still to place — capped at 50 per stop at checkout. The
+partner's name and confirmed flag are on the stop form. The thank-you on the
+success page and in the ticket email says the seats and the city and nothing
+about the family; placement is anonymous through the partner. These are
+purchases of seats for distribution, not donations, and nothing calls them
+tax-deductible. Checkout copy is the headline and one line; the rest belongs
+in the one-pager.
+
 **Sales tax** runs through Stripe Tax when `BOXOFFICE_TAX=true` — activate Stripe
 Tax in the dashboard first, or every checkout fails. Tickets use Stripe's own
 default for ticket sales (`txcd_20030000`, General – Services) and merch the

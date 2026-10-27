@@ -74,6 +74,15 @@ const error = Astro.url.searchParams.get('error');
         <span class="hint">Nothing sells unless this says on sale.</span></label>
     </div>
 
+    <div class="grid">
+      <label><span class="label">Sponsor a Family — local partner</span>
+        <input name="partner_name" value={event?.partner_name ?? ''} placeholder="Catholic Charities of Omaha" />
+        <span class="hint">The agency, parish or ministry that places sponsored seats with families.</span></label>
+      <label class="check"><input type="checkbox" name="partner_confirmed" value="1" checked={!!event?.partner_confirmed} />
+        <span class="label">Partner confirmed</span>
+        <span class="hint">Until this is ticked, “The Whole Block” (50 seats) is not offered at this stop.</span></label>
+    </div>
+
     <label><span class="label">Blurb</span>
       <textarea name="blurb" rows="3">{event?.blurb ?? ''}</textarea></label>
     <label><span class="label">Poster image path</span>
@@ -115,6 +124,9 @@ const error = Astro.url.searchParams.get('error');
 <style>
   form { max-width: 52rem; }
   .grid { display: grid; gap: 0 1.2rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .check { display: flex; gap: .6rem; align-items: flex-start; margin: 1.6rem 0 1rem; }
+  .check input { margin-top: .35rem; width: 1.1rem; height: 1.1rem; }
+  .check .label { display: block; }
   label { display: block; margin-bottom: 1.1rem; }
   .label { display: block; margin-bottom: .35rem; }
   input, select, textarea {

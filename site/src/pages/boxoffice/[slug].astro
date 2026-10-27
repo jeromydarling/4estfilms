@@ -1,7 +1,7 @@
 ---
 import BoxOffice from '../../layouts/BoxOffice.astro';
-import { getEvent, getOffered, getProducts, soldAdmits } from '../../lib/boxoffice-db';
-import { TOUR, money, showTime } from '../../lib/boxoffice';
+import { getEvent, getOffered, getProducts, listEvents, soldAdmits } from '../../lib/boxoffice-db';
+import { SPONSOR, TOUR, money, showTime } from '../../lib/boxoffice';
 
 export const prerender = false;
 
@@ -32,6 +32,15 @@ const items = [...products.values()]
 const seats = items.filter((p) => p.kind !== 'merch');
 const addons = items.filter((p) => p.kind === 'merch');
 const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+
+// Sponsor a Family. The Whole Block only where this stop's partner is
+// confirmed; the other two everywhere. "A different city" offers every
+// upcoming stop, and the server checks the chosen one's partner and pool.
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = (await listEvents(['on_sale'])).filter(
+  (e) => e.id === event.id || e.starts_at.slice(0, 10) >= today
+);
+const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_confirmed);
 ---
 
 <BoxOffice
@@ -131,6 +140,43 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         </>
       )}
 
+      <h2>{SPONSOR.headline}</h2>
+      <p class="fine">{SPONSOR.line}</p>
+      <div class="tiers" data-sponsor>
+        <label class="tier tier--on">
+          <input type="radio" name="sponsor_tier" value="none" checked />
+          <span class="tier__name">Not today</span>
+        </label>
+        {tiers.map((t) => (
+          <label class="tier" data-tier={t.id} data-partner={t.partnerOnly ? '1' : '0'}>
+            <input type="radio" name="sponsor_tier" value={t.id} />
+            <span class="tier__name">{t.name}</span>
+            <span class="tier__price">{money(t.cents).replace(/\.00$/, '')}</span>
+          </label>
+        ))}
+        <div class="tier__qty" data-sponsorqty hidden>
+          <span class="fine">How many</span>
+          <span class="pick__qty">
+            <button type="button" class="step" data-sstep="-1" aria-label="One fewer">−</button>
+            <output data-sqty>1</output>
+            <button type="button" class="step" data-sstep="1" aria-label="One more">+</button>
+          </span>
+        </div>
+        <p class="fine tier__city">
+          <button type="button" class="linkish" data-sponsorcity>Sponsor in a different city</button>
+        </p>
+        <label class="field" data-sponsorstopwrap hidden>
+          <span>Which stop</span>
+          <select data-sponsorstop>
+            {upcoming.map((e) => (
+              <option value={e.slug} data-partner={e.partner_confirmed ? '1' : '0'} selected={e.id === event.id}>
+                {e.venue}, {e.city} — {showTime(e.starts_at)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <h2>Promo code</h2>
       <p class="fine">
         If a parish or group sent you here, their code tells us they did.
@@ -147,6 +193,9 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         <div class="total__row"><span>Subtotal</span><span data-sub>$0</span></div>
         <div class="total__row total__row--off" data-offrow hidden>
           <span data-offlabel>Discount</span><span data-off>$0</span>
+        </div>
+        <div class="total__row" data-sponsorrow hidden>
+          <span data-sponsorlabel>Sponsor a Family</span><span data-sponsoramt>$0</span>
         </div>
         <div class="total__row total__row--due"><span>Total</span><span data-due>$0</span></div>
         <p class="fine" data-seats></p>
@@ -199,6 +248,12 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
 
     const state = new Map<string, { qty: number; size: string | null }>();
     let appliedPromo = '';
+    // Sponsor a Family: nothing until chosen, bound to this stop unless the
+    // buyer picks another. The server prices and checks it like the basket.
+    const sponsor = { tier: 'none', qty: 1, stop: slug };
+    const sponsorPick = () =>
+      sponsor.tier === 'none' ? null : { tier: sponsor.tier, qty: sponsor.qty, stop: sponsor.stop };
+    const sponsorRow = form.querySelector<HTMLElement>('[data-sponsorrow]')!;
     // Two quick taps are two quotes in flight; only the latest may paint.
     // The server prices the real basket at checkout regardless, so this is
     // about the number on the button matching the number on the card.
@@ -238,11 +293,12 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         const res = await fetch('/api/boxoffice/quote', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ slug, basket: b, promo: appliedPromo }),
+          body: JSON.stringify({ slug, basket: b, promo: appliedPromo, sponsor: sponsorPick() }),
         });
         const q = await res.json() as {
           ok?: boolean; error?: string; subtotal_cents?: number;
-          discount_cents?: number; total_cents?: number; admits?: number;
+          discount_cents?: number; total_cents?: number; grand_total_cents?: number; admits?: number;
+          sponsor?: { name: string; qty: number; seats: number; cents: number; city: string } | null;
         };
         if (mine !== quoteSeq) return;
         if (!q.ok) {
@@ -259,11 +315,20 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
         const offRow = form.querySelector<HTMLElement>('[data-offrow]')!;
         offRow.hidden = !q.discount_cents;
         form.querySelector('[data-off]')!.textContent = `−${money(q.discount_cents!)}`;
-        form.querySelector('[data-due]')!.textContent = money(q.total_cents!);
+        if (q.sponsor) {
+          sponsorRow.hidden = false;
+          form.querySelector('[data-sponsorlabel]')!.textContent =
+            `${q.sponsor.name}${q.sponsor.qty > 1 ? ` × ${q.sponsor.qty}` : ''} — ${q.sponsor.seats} seats, ${q.sponsor.city}`;
+          form.querySelector('[data-sponsoramt]')!.textContent = money(q.sponsor.cents);
+        } else {
+          sponsorRow.hidden = true;
+        }
+        const due = q.grand_total_cents ?? q.total_cents!;
+        form.querySelector('[data-due]')!.textContent = money(due);
         form.querySelector('[data-seats]')!.textContent =
           q.admits ? `${q.admits} ${q.admits === 1 ? 'seat' : 'seats'}` : 'Merchandise only';
         go.disabled = false;
-        go.textContent = `Pay ${money(q.total_cents!)}`;
+        go.textContent = `Pay ${money(due)}`;
       } catch {
         msg.textContent = 'Network trouble. Try again.';
         msg.dataset.state = 'err';
@@ -306,6 +371,68 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
       });
     }
 
+    // ── Sponsor a Family ──
+    const sponsorBox = form.querySelector<HTMLElement>('[data-sponsor]')!;
+    const qtyBox = sponsorBox.querySelector<HTMLElement>('[data-sponsorqty]')!;
+    const qtyOut = sponsorBox.querySelector<HTMLOutputElement>('[data-sqty]')!;
+    // Cast, not generic: inside an Astro <script> the bare name `Element` is
+    // the JSX type and HTMLSelectElement does not satisfy it.
+    const stopSel = sponsorBox.querySelector('[data-sponsorstop]') as unknown as HTMLSelectElement;
+    const tierLabels = [...sponsorBox.querySelectorAll<HTMLElement>('.tier')];
+
+    function paintSponsor() {
+      for (const l of tierLabels) {
+        const input = l.querySelector<HTMLInputElement>('input')!;
+        l.classList.toggle('tier--on', input.value === sponsor.tier);
+      }
+      qtyBox.hidden = sponsor.tier === 'none';
+      qtyOut.textContent = String(sponsor.qty);
+    }
+
+    // The Whole Block follows the chosen stop's partner, not this page's.
+    function paintBlockTier() {
+      const opt = stopSel.selectedOptions[0];
+      const partner = opt?.dataset.partner === '1';
+      const block = tierLabels.find((l) => l.dataset.tier === 'block');
+      if (!block) return;
+      block.hidden = !partner;
+      if (!partner && sponsor.tier === 'block') {
+        sponsor.tier = 'none';
+        (sponsorBox.querySelector('input[value="none"]') as HTMLInputElement).checked = true;
+      }
+    }
+
+    sponsorBox.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.name === 'sponsor_tier') {
+        sponsor.tier = t.value;
+        // "Not today" means not today — the next choice starts at one again.
+        if (t.value === 'none') sponsor.qty = 1;
+        paintSponsor();
+        refresh();
+      }
+    });
+    sponsorBox.addEventListener('click', (e) => {
+      const step = (e.target as HTMLElement).closest<HTMLElement>('[data-sstep]');
+      if (!step) return;
+      e.preventDefault();
+      sponsor.qty = Math.max(1, Math.min(12, sponsor.qty + Number(step.dataset.sstep)));
+      paintSponsor();
+      refresh();
+    });
+    sponsorBox.querySelector('[data-sponsorcity]')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      sponsorBox.querySelector<HTMLElement>('[data-sponsorstopwrap]')!.hidden = false;
+      sponsorBox.querySelector<HTMLElement>('.tier__city')!.hidden = true;
+      stopSel.focus();
+    });
+    stopSel.addEventListener('change', () => {
+      sponsor.stop = stopSel.value;
+      paintBlockTier();
+      paintSponsor();
+      refresh();
+    });
+
     form.querySelector('[data-promo]')!.addEventListener('click', async () => {
       appliedPromo = promoInput.value.trim().toUpperCase();
       promoInput.value = appliedPromo;
@@ -344,7 +471,7 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            slug, basket: basket(), promo: appliedPromo,
+            slug, basket: basket(), promo: appliedPromo, sponsor: sponsorPick(),
             subscribe: form.querySelector<HTMLInputElement>('[name="subscribe"]')?.checked === true,
           }),
         });
@@ -455,6 +582,23 @@ const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
     color: var(--parchment); font-family: var(--mono); font-size: .8rem; cursor: pointer;
   }
   .size--on { border-color: var(--brass); color: var(--brass-lift); background: var(--ground-3); }
+
+  .tiers { display: grid; gap: .5rem; margin: .4rem 0 .6rem; }
+  .tier {
+    display: flex; align-items: center; gap: .8rem; min-height: 3rem;
+    border: 1px solid var(--rule); border-radius: 4px; padding: .7rem .9rem;
+    background: var(--ground-2); cursor: pointer;
+  }
+  .tier input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--brass); flex: 0 0 auto; }
+  .tier--on { border-color: var(--brass); background: var(--ground-3); }
+  .tier__name { font-family: var(--display); font-size: 1.05rem; flex: 1 1 auto; }
+  .tier__price { font-family: var(--mono); font-size: .95rem; color: var(--brass-lift); white-space: nowrap; }
+  .tier__qty { display: flex; align-items: center; justify-content: space-between; padding: .2rem .2rem 0; }
+  .tier__city { margin: .2rem 0 0; }
+  .linkish {
+    background: none; border: 0; padding: 0; color: var(--brass-lift);
+    text-decoration: underline; font: inherit; cursor: pointer;
+  }
 
   .promo { display: flex; gap: .5rem; }
   .promo input { flex: 1 1 auto; text-transform: uppercase; }

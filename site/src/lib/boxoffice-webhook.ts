@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { getEventById, getOffered, getProducts, recordOrder } from './boxoffice-db';
-import { TOUR, money, priceBasket, showTime, stripeKey, type BasketLine } from './boxoffice';
+import {
+  TOUR, money, priceBasket, showTime, sponsorFamilies, sponsorTier, stripeKey, type BasketLine,
+} from './boxoffice';
 import { confirmEmail, layout, newToken, send, SITE } from './email';
 import type { CheckoutSession } from './stripe';
 
@@ -68,12 +70,19 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
     return new Response('unpriceable', { status: 200 });
   }
 
+  // Sponsor a Family, as the session was opened: the tier and the stop it
+  // was bound to, re-checked against the catalogue so a stray value cannot
+  // write a seat count the tier does not have.
+  const sponsor = readSponsor(s.metadata);
+  const sponsorStop = sponsor ? await getEventById(sponsor.stop_id) : null;
+
   // Stripe's own total is the truth about what was taken — it carries the
   // coupon. Sales tax is taken out of it first: the tax is remitted, not
   // earned, and gross has to mean the price of the seats.
   const tax = Math.max(0, s.total_details?.amount_tax ?? 0);
   const total = (typeof s.amount_total === 'number' ? s.amount_total : priced.total_cents) - tax;
-  const discount = Math.max(0, priced.subtotal_cents - total);
+  const subtotal = priced.subtotal_cents + (sponsor ? sponsor.tier.cents * sponsor.qty : 0);
+  const discount = Math.max(0, subtotal - total);
 
   let fee = 0;
   const { key } = stripeKey();
@@ -88,11 +97,12 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   const recorded = await recordOrder({
     event,
     lines: priced.lines,
-    subtotal_cents: priced.subtotal_cents,
+    subtotal_cents: subtotal,
     discount_cents: discount,
     total_cents: total,
     fee_cents: fee,
     tax_cents: tax,
+    sponsor: sponsor && sponsorStop ? { ...sponsor, stop_id: sponsorStop.id } : null,
     promo_code: s.metadata?.promo_code ?? null,
     // The door's card sales come through here too, flagged when the session
     // was opened, so the report can tell presale from walk-up.
@@ -105,6 +115,22 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   });
 
   if (recorded.duplicate) return new Response('duplicate', { status: 200 });
+
+  // The payment's own metadata gets the buyer's address now that Checkout
+  // has collected it, so a sponsorship can be traced from the Stripe side
+  // alone. Best effort: our record already has it.
+  const buyerEmail = s.customer_details?.email ?? s.customer_email ?? null;
+  if (sponsor && s.payment_intent && key && buyerEmail) {
+    try {
+      await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(s.payment_intent)}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'metadata[buyer_email]': buyerEmail.slice(0, 254) }),
+      });
+    } catch (err) {
+      console.error('could not stamp buyer_email on the payment', { session: s.id, err });
+    }
+  }
 
   // They ticked "keep me posted". Double opt-in like everyone else on the
   // list: a row and a confirmation email, never a silent subscription.
@@ -132,6 +158,7 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
         doors: event.doors_at ? showTime(event.doors_at) : null,
         total,
         items: priced.lines.map((l) => `${l.qty} × ${l.name}${l.size ? ` (${l.size})` : ''}`),
+        sponsor: sponsor && sponsorStop ? sponsorLine(sponsor.tier, sponsor.qty, sponsor.seats, sponsorStop.city) : null,
       });
     }
   } catch (err) {
@@ -139,6 +166,27 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
   }
 
   return new Response('ok', { status: 200 });
+}
+
+function readSponsor(m: Record<string, string> | undefined) {
+  const tier = sponsorTier(m?.sponsor_tier);
+  if (!tier) return null;
+  const qty = Math.floor(Number(m?.sponsor_qty));
+  const stop_id = Number(m?.sponsor_stop_id);
+  if (!Number.isFinite(qty) || qty < 1 || !Number.isFinite(stop_id)) return null;
+  // Seats are the tier's arithmetic, never the metadata's word for it.
+  return { tier, qty, seats: tier.seats * qty, stop_id };
+}
+
+/**
+ * "You sponsored 4 seats for a foster or adoptive family in Omaha."
+ *
+ * Specific about the seats and the city; silent about the family. Placement
+ * is anonymous, through the local partner, and the buyer is promised
+ * nothing about who sat where.
+ */
+export function sponsorLine(tier: ReturnType<typeof sponsorTier> & object, qty: number, seats: number, city: string): string {
+  return `You sponsored ${seats} seats for ${sponsorFamilies(tier, qty)} in ${city}.`;
 }
 
 async function subscribeBuyer(rawEmail: string, name: string | null): Promise<void> {
@@ -172,8 +220,13 @@ export async function sendTickets(t: {
   doors: string | null;
   total: number;
   items: string[];
+  /** The Sponsor a Family thank-you, when there is one. */
+  sponsor?: string | null;
 }) {
   const hello = t.name ? `You’re in, ${t.name.split(' ')[0]}.` : 'You’re in.';
+  const sponsorHtml = t.sponsor
+    ? `<p style="margin:0 0 18px;padding:12px 14px;border-left:3px solid #96001f;color:#f2ede3;">${t.sponsor} Thank you.</p>`
+    : '';
 
   // One block per admission. The QR is served from our own domain rather than
   // inlined: a data: URI is stripped by a good share of mail clients, and a
@@ -211,6 +264,7 @@ export async function sendTickets(t: {
         `<p style="margin:0 0 4px;">${t.when}</p>` +
         (t.doors ? `<p style="margin:0 0 14px;color:#8b857a;">Doors ${t.doors}</p>` : '') +
         `<p style="margin:0 0 18px;color:#8b857a;">${t.items.join(' &middot; ')} — ${money(t.total)}</p>` +
+        sponsorHtml +
         tickets +
         `<p style="margin:0;color:#8b857a;">Show a code at the door, on your phone or printed. ` +
         `If your battery dies we can find you by name.</p>`,
@@ -220,6 +274,7 @@ export async function sendTickets(t: {
       `${hello}\n\n${t.venue}\n${t.city}\n${t.when}\n` +
       (t.doors ? `Doors ${t.doors}\n` : '') +
       `\n${t.items.join(' · ')} — ${money(t.total)}\n\n` +
+      (t.sponsor ? `${t.sponsor} Thank you.\n\n` : '') +
       `Ticket codes:\n${t.codes.join('\n')}\n\n` +
       `Show a code at the door. If your battery dies we can find you by name.`,
     campaign: 'boxoffice-tickets',

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getEvent, quote } from '../../../lib/boxoffice-db';
+import { getEvent, quote, type SponsorPick } from '../../../lib/boxoffice-db';
 import { stripeKey, taxConfig, type BasketLine } from '../../../lib/boxoffice';
 
 export const prerender = false;
@@ -21,7 +21,10 @@ const json = (b: unknown, status = 200) =>
   });
 
 export const POST: APIRoute = async ({ request, url }) => {
-  let body: { slug?: string; basket?: BasketLine[]; promo?: string; email?: string; subscribe?: boolean };
+  let body: {
+    slug?: string; basket?: BasketLine[]; promo?: string; email?: string; subscribe?: boolean;
+    sponsor?: SponsorPick | null;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -34,9 +37,11 @@ export const POST: APIRoute = async ({ request, url }) => {
     return json({ ok: false, error: 'Tickets for this stop aren’t on sale.' }, 409);
   }
 
-  const q = await quote(event, Array.isArray(body.basket) ? body.basket : [], body.promo);
+  const q = await quote(event, Array.isArray(body.basket) ? body.basket : [], body.promo, {
+    sponsor: body.sponsor ?? null,
+  });
   if (!q.ok) return json({ ok: false, error: q.error, soldOut: q.soldOut }, 422);
-  const { priced, promo } = q;
+  const { priced, promo, sponsor } = q;
 
   const { key, error: keyError } = stripeKey();
   if (!key) {
@@ -107,6 +112,41 @@ export const POST: APIRoute = async ({ request, url }) => {
       );
     }
   });
+
+  // Sponsor a Family: one more line on the same payment, one receipt. The
+  // facts go on the session and on the payment itself, so Stripe's record
+  // can be matched to ours without us in the middle. Seats bought for
+  // distribution — nothing here says "donation".
+  if (sponsor) {
+    const i = priced.lines.length;
+    const where = `${sponsor.stop.venue}, ${sponsor.stop.city}${sponsor.stop.region ? `, ${sponsor.stop.region}` : ''}`;
+    form.set(`line_items[${i}][price_data][currency]`, 'usd');
+    form.set(`line_items[${i}][price_data][unit_amount]`, String(sponsor.tier.cents));
+    form.set(`line_items[${i}][price_data][product_data][name]`, `Sponsor a Family — ${sponsor.tier.name}`);
+    form.set(
+      `line_items[${i}][price_data][product_data][description]`,
+      `${sponsor.tier.seats} sponsored seats for foster and adoptive families at ${where}`
+    );
+    form.set(`line_items[${i}][quantity]`, String(sponsor.qty));
+    if (tax.enabled) {
+      form.set(`line_items[${i}][price_data][tax_behavior]`, 'exclusive');
+      form.set(`line_items[${i}][price_data][product_data][tax_code]`, tax.ticket);
+    }
+    const meta = {
+      sponsor_tier: sponsor.tier.id,
+      sponsor_qty: String(sponsor.qty),
+      sponsor_seats: String(sponsor.seats),
+      sponsor_stop_id: String(sponsor.stop.id),
+      sponsor_stop: sponsor.stop.slug,
+    };
+    for (const [k, v] of Object.entries(meta)) {
+      form.set(`metadata[${k}]`, v);
+      form.set(`payment_intent_data[metadata][${k}]`, v);
+    }
+    // Only when the page already knows it; the webhook adds the address the
+    // buyer actually typed into Checkout.
+    if (body.email) form.set('payment_intent_data[metadata][buyer_email]', String(body.email).slice(0, 254));
+  }
 
   // A percentage code is applied as a Stripe coupon so the buyer sees the
   // discount on Stripe's own page, not just in our total.
