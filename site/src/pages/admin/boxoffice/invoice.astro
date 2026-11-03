@@ -1,0 +1,146 @@
+---
+import { hasSession } from '../../../lib/admin';
+import { getEvent } from '../../../lib/boxoffice-db';
+import { invoiceDoc } from '../../../lib/boxoffice-report';
+import { TOUR, money, showTime } from '../../../lib/boxoffice';
+
+export const prerender = false;
+
+/**
+ * The invoice as a document: one sheet a parish or school office can pay
+ * from, print, file and forward to whoever signs the cheques.
+ *
+ * Same white-on-paper dress as the settlement statement. The facts are the
+ * order's own — number, bill-to, line items, due date — so what the office
+ * holds and what the report says cannot drift apart.
+ */
+if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
+
+const slug = Astro.url.searchParams.get('slug') ?? '';
+const event = await getEvent(slug);
+if (!event) return Astro.redirect('/admin/boxoffice/');
+
+const doc = await invoiceDoc(Number(Astro.url.searchParams.get('order') ?? ''));
+if (!doc || doc.event_id !== event.id) {
+  return Astro.redirect(`/admin/boxoffice/report/?slug=${encodeURIComponent(slug)}`);
+}
+
+const city = `${event.city}${event.region ? `, ${event.region}` : ''}`;
+const number = doc.invoice_number ?? `#${doc.id}`;
+const org = doc.org_name ?? doc.buyer_name ?? '—';
+const today = new Date().toISOString().slice(0, 10);
+const overdue = doc.status === 'unpaid' && !!doc.due_on && doc.due_on < today;
+const statusLabel =
+  doc.status === 'paid'
+    ? `Paid${doc.pay_method ? ` by ${doc.pay_method}` : ''}${doc.reference ? ` · ${doc.reference}` : ''}`
+    : doc.status === 'cancelled'
+      ? 'Cancelled'
+      : overdue
+        ? 'Unpaid — past due'
+        : 'Unpaid';
+const addressLines = (doc.buyer_address ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Invoice {number} — {org}</title>
+  </head>
+  <body>
+    <button class="print" type="button" onclick="print()">Print</button>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Invoice {number}</p>
+          <h1>{org}</h1>
+          <p class="sub">{TOUR.film} · {event.venue}, {city}</p>
+        </div>
+        <div class="from">
+          <strong>4est Films</strong><br />
+          Known, LLC<br />
+          1964 Inglewood Ave SW<br />
+          New Prague, MN 56071<br />
+          jer@jeromydarling.com · 612-225-8165
+        </div>
+      </header>
+
+      <h2>Bill to</h2>
+      <p class="billto">
+        <strong>{org}</strong>
+        {doc.contact_name && <><br />Attn: {doc.contact_name}</>}
+        {addressLines.map((l) => <><br />{l}</>)}
+        {doc.buyer_email && <><br />{doc.buyer_email}</>}
+      </p>
+
+      <h2>The screening</h2>
+      <table>
+        <tr><td>Film</td><td class="r">{event.title}</td></tr>
+        <tr><td>Venue</td><td class="r">{event.venue}, {city}</td></tr>
+        <tr><td>Show</td><td class="r">{showTime(event.starts_at)}</td></tr>
+        {event.doors_at && <tr><td>Doors</td><td class="r">{showTime(event.doors_at)}</td></tr>}
+      </table>
+
+      <h2>Charges</h2>
+      <table>
+        {doc.items.map((i) => (
+          <tr>
+            <td>{i.name}</td>
+            <td class="r">{i.qty} × {money(i.unit_price_cents)}</td>
+            <td class="r">{money(i.qty * i.unit_price_cents)}</td>
+          </tr>
+        ))}
+        <tr class="sum big"><td>Total due</td><td></td><td class="r">{money(doc.total_cents)}</td></tr>
+      </table>
+
+      <h2>Invoice details</h2>
+      <table>
+        <tr><td>Invoice number</td><td class="r">{number}</td></tr>
+        {doc.issued_on && <tr><td>Issued</td><td class="r">{doc.issued_on}</td></tr>}
+        {doc.due_on && <tr><td>Due</td><td class="r">{doc.due_on}</td></tr>}
+        <tr><td>Status</td><td class="r">{statusLabel}</td></tr>
+      </table>
+      {doc.note && <p class="fine">{doc.note}</p>}
+
+      {doc.status === 'unpaid' && (
+        <p class="foot">
+          Please make cheques payable to <strong>Known, LLC</strong> and mail them to
+          1964 Inglewood Ave SW, New Prague, MN 56071. For ACH or card payment, write to
+          jer@jeromydarling.com or call 612-225-8165. Tickets are issued by email as soon
+          as payment lands, and the seats on this invoice are held for you until the due date.
+        </p>
+      )}
+      {doc.status === 'paid' && (
+        <p class="foot">
+          Paid in full — thank you. The tickets for these seats were emailed when payment
+          landed. Questions: jer@jeromydarling.com · 612-225-8165.
+        </p>
+      )}
+    </main>
+  </body>
+</html>
+
+<style is:global>
+  @page { margin: 0.7in; }
+  html, body { margin: 0; background: #fff; color: #17110D; }
+  body { font-family: Georgia, 'Times New Roman', serif; padding: 2rem 1.2rem; font-size: 14px; }
+  main { max-width: 44rem; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; gap: 2rem; align-items: flex-start; border-bottom: 2px solid #17110D; padding-bottom: 1rem; }
+  .eyebrow { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: #7a5a1e; margin: 0 0 .3rem; }
+  h1 { margin: 0; font-size: 1.9rem; font-weight: 400; }
+  .sub { margin: .3rem 0 0; color: #5a5048; }
+  .from { text-align: right; font-size: .85rem; color: #3b332c; line-height: 1.5; }
+  h2 { font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; color: #7a5a1e; margin: 1.6rem 0 .4rem; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: .35rem 0; border-bottom: 1px solid #e4ddd0; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sum td { border-top: 1.5px solid #17110D; font-weight: 600; }
+  .big td { font-size: 1.1rem; }
+  .billto { line-height: 1.6; margin: .2rem 0 0; }
+  .fine { font-size: .8rem; color: #6b6259; }
+  .foot { margin-top: 2rem; border-top: 1px solid #e4ddd0; padding-top: .8rem; font-size: .9rem; line-height: 1.6; }
+  .print { position: fixed; top: 1rem; right: 1rem; font: inherit; padding: .5rem 1rem; background: #17110D; color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+  @media print { .print { display: none; } body { padding: 0; } }
+</style>

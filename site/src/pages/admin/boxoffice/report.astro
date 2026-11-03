@@ -54,6 +54,9 @@ const flash = [
   q.get('invoice') === 'cancelled' && 'Invoice cancelled; the seats are released.',
   q.get('invoice') === 'state' && 'That invoice isn’t open.',
   q.get('invoice') === 'name' && 'An invoice needs a name.',
+  q.get('invoice') === 'emailed' && 'Invoice emailed to the group.',
+  q.get('invoice') === 'emailfail' && 'The invoice email failed — print it and send it by hand.',
+  q.get('invoice') === 'noaddr' && 'That invoice has no email address on it.',
   q.get('settled') === 'done' && 'Payment recorded.',
   q.get('settled') === 'removed' && 'Payment removed.',
   q.get('settled') === 'bad' && 'A payment needs a kind and an amount.',
@@ -72,6 +75,7 @@ const postShow =
   `and the making-of documentary and the songs from the film come with it.\n\n` +
   `Tell someone in the next town.`;
 const unpaidInvoices = invoices.filter((i) => i.status === 'unpaid');
+const today = new Date().toISOString().slice(0, 10);
 const openWaitlist = waitlist.filter((w) => !w.notified_at);
 const poolOpen = Math.max(0, SPONSOR.capPerStop - totals.sponsored_seats);
 const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sponsor_released;
@@ -357,26 +361,44 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
   <h2>Group invoices</h2>
   <p class="muted small">
     Forty seats for a parish, paid by cheque. The seats are held the moment the invoice exists;
-    the tickets are minted and sent the moment it’s marked paid.
+    the tickets are minted and sent the moment it’s marked paid. Every invoice carries a number
+    and a due date — leave the date blank for the earlier of fourteen days or a week before the
+    show. The printed invoice is the sheet the group’s office pays from.
   </p>
   <div class="scroll">
     <table>
-      <thead><tr><th>Created</th><th>Who</th><th class="right">Seats</th><th class="right">Amount</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Invoice</th><th>Who</th><th class="right">Seats</th><th class="right">Amount</th><th>Due</th><th>Status</th><th></th></tr></thead>
       <tbody>
         {invoices.length ? invoices.map((i) => (
           <tr class={i.status === 'cancelled' ? 'off' : ''}>
-            <td class="num">{i.created_at.slice(0, 10)}</td>
-            <td>{i.buyer_name}<br /><span class="muted">{i.buyer_email ?? ''}{i.note ? ` · ${i.note}` : ''}</span></td>
+            <td class="num">
+              <a href={`/admin/boxoffice/invoice/?slug=${event.slug}&order=${i.id}`} target="_blank" rel="noopener">{i.invoice_number ?? `#${i.id}`}</a>
+              <br /><span class="muted">{i.created_at.slice(0, 10)}</span>
+            </td>
+            <td>{i.buyer_name}<br /><span class="muted">{[i.contact_name, i.buyer_email].filter(Boolean).join(' · ')}{i.note ? ` · ${i.note}` : ''}</span></td>
             <td class="right num">{i.status === 'unpaid' ? i.reserved_admits : i.seats}</td>
             <td class="right num">{money(i.total_cents)}</td>
-            <td>{i.status}{i.reference ? <span class="muted"> · {i.reference}</span> : null}</td>
+            <td class="num">{i.due_on ?? '—'}{i.status === 'unpaid' && i.due_on && i.due_on < today ? <><br /><span class="bad">past due</span></> : null}</td>
+            <td>{i.status}{i.pay_method ? <span class="muted"> · {i.pay_method}</span> : null}{i.reference ? <span class="muted"> · {i.reference}</span> : null}{i.sent_at ? <><br /><span class="muted">emailed {i.sent_at.slice(0, 10)}</span></> : null}</td>
             <td class="right">
               {i.status === 'unpaid' && (
                 <>
                   <form method="post" action="/api/admin/boxoffice/invoice" class="inline">
+                    <input type="hidden" name="action" value="send" />
+                    <input type="hidden" name="slug" value={event.slug} />
+                    <input type="hidden" name="order_id" value={String(i.id)} />
+                    <button class="refund" type="submit">{i.sent_at ? 'Re-email invoice' : 'Email invoice'}</button>
+                  </form>
+                  <form method="post" action="/api/admin/boxoffice/invoice" class="inline">
                     <input type="hidden" name="action" value="paid" />
                     <input type="hidden" name="slug" value={event.slug} />
                     <input type="hidden" name="order_id" value={String(i.id)} />
+                    <select name="method" class="tiny">
+                      <option value="cheque">cheque</option>
+                      <option value="transfer">transfer</option>
+                      <option value="card">card</option>
+                      <option value="cash">cash</option>
+                    </select>
                     <input name="reference" placeholder="cheque #" class="tiny" />
                     <button class="refund" type="submit">Mark paid</button>
                   </form>
@@ -396,7 +418,7 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
               )}
             </td>
           </tr>
-        )) : <tr><td colspan="6" class="empty">No group invoices.</td></tr>}
+        )) : <tr><td colspan="7" class="empty">No group invoices.</td></tr>}
       </tbody>
     </table>
   </div>
@@ -405,8 +427,11 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
     <input type="hidden" name="action" value="create" />
     <label><span class="label">Seats</span><input name="seats" type="number" min="1" max="2000" value="20" required /></label>
     <label><span class="label">Group</span><input name="name" placeholder="St Mary’s, Yankton" required /></label>
-    <label><span class="label">Email (gets the tickets)</span><input name="email" type="email" /></label>
+    <label><span class="label">Contact</span><input name="contact" placeholder="parish secretary" /></label>
+    <label><span class="label">Email (invoice, then tickets)</span><input name="email" type="email" /></label>
     <label><span class="label">Rate each</span><input name="rate" inputmode="decimal" placeholder="stop price" /></label>
+    <label><span class="label">Due</span><input name="due" type="date" /></label>
+    <label class="grow"><span class="label">Billing address</span><textarea name="address" rows="2" placeholder={'123 Main St\nYankton, SD 57078'}></textarea></label>
     <label class="grow"><span class="label">Note</span><input name="note" /></label>
     <button type="submit">Create invoice</button>
   </form>
@@ -556,12 +581,12 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
   .row { display: flex; flex-wrap: wrap; gap: .7rem; align-items: flex-end; margin: .8rem 0 1.6rem; }
   .row label { display: block; }
   .row .grow { flex: 1 1 12rem; }
-  .row input, .row select, .msg input, .msg textarea, .tiny {
+  .row input, .row select, .row textarea, .msg input, .msg textarea, .tiny {
     background: var(--ink-2); border: 1px solid var(--rule); border-radius: 3px;
     color: var(--bone); font: inherit; padding: .5rem .7rem; width: 100%; box-sizing: border-box;
   }
   .row input { width: 11rem; }
-  .row .grow input { width: 100%; }
+  .row .grow input, .row .grow textarea { width: 100%; }
   .row button, .msg button {
     background: var(--blood); border: 0; border-radius: 3px; color: #fff;
     font: inherit; font-weight: 600; padding: .55rem 1rem; cursor: pointer;

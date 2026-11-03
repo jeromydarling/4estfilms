@@ -1,7 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
-import { offeringsAt, stock, stopTotals } from '../../../lib/boxoffice-report';
+import { offeringsAt, openInvoices, stock, stopTotals } from '../../../lib/boxoffice-report';
 import { TOUR, money, showTime } from '../../../lib/boxoffice';
 
 export const prerender = false;
@@ -36,6 +36,12 @@ const tour = {
 const perHead = tour.attendees
   ? Math.round((tour.gross - tour.refunded) / tour.attendees)
   : 0;
+// Group invoices still waiting on money, across every stop. A parish
+// office gone quiet is invisible on its own stop's report until somebody
+// goes looking, so the open ones sit here, soonest due first.
+const open = await openInvoices();
+const openCents = open.reduce((n, i) => n + i.total_cents, 0);
+
 // Parishes whose night has happened and who have not yet been paid in full.
 const today = new Date().toISOString().slice(0, 10);
 const owed = stops.filter((s) => s.starts_at.slice(0, 10) < today && s.parish_due_cents > 0);
@@ -105,6 +111,44 @@ const owedCents = owed.reduce((n, s) => n + s.parish_due_cents, 0);
     <button class="lnk linkbtn" type="button" data-digest>Send the digest now</button>
     <span class="muted" data-digestmsg></span>
   </p>
+
+  {!!open.length && (
+    <section>
+      <h2>Open group invoices <span class="legnet">{money(openCents)} outstanding</span></h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Invoice</th><th>Group</th><th>Stop</th><th class="right">Seats</th><th class="right">Amount</th><th>Due</th><th></th></tr>
+          </thead>
+          <tbody>
+            {open.map((i) => (
+              <tr>
+                <td class="num">
+                  <a href={`/admin/boxoffice/invoice/?slug=${i.slug}&order=${i.id}`} target="_blank" rel="noopener">{i.invoice_number ?? `#${i.id}`}</a>
+                </td>
+                <td>
+                  {i.org_name ?? i.buyer_name}
+                  <br /><span class="muted">{[i.contact_name, i.buyer_email].filter(Boolean).join(' · ')}</span>
+                </td>
+                <td>
+                  <strong>{i.venue}</strong><br />
+                  <span class="muted">{i.city}{i.region ? `, ${i.region}` : ''} · {showTime(i.starts_at)}</span>
+                </td>
+                <td class="right num">{i.reserved_admits}</td>
+                <td class="right num">{money(i.total_cents)}</td>
+                <td class="num">
+                  {i.due_on ?? '—'}
+                  {i.due_on && i.due_on < today ? <><br /><span class="bad">past due</span></> : null}
+                  {i.sent_at ? <><br /><span class="muted">emailed {i.sent_at.slice(0, 10)}</span></> : null}
+                </td>
+                <td class="right"><a href={`/admin/boxoffice/report/?slug=${i.slug}`}>report</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )}
 
   {legs.map((leg) => {
     const rows = stops.filter((s) => (s.leg ?? 'Unassigned') === leg);

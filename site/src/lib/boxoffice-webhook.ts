@@ -282,6 +282,71 @@ export async function sendTickets(t: {
 }
 
 /**
+ * The invoice itself, emailed to the group's office.
+ *
+ * The tickets wait for the money; this does not. A parish business office
+ * pays from a document, so the email carries the whole document — who is
+ * billed, what for, how much, when it is due and where the cheque goes —
+ * and the printed page in the admin is the same facts on paper.
+ * Replies land with Jeromy rather than the hello@ sender, because the
+ * answer to an invoice is usually a question about money.
+ */
+export async function sendInvoice(t: {
+  to: string;
+  org: string;
+  contact: string | null;
+  number: string;
+  dueOn: string | null;
+  venue: string;
+  city: string;
+  when: string;
+  doors: string | null;
+  items: string[];
+  total: number;
+  note: string | null;
+}) {
+  const due = t.dueOn ?? 'on receipt';
+  const pay =
+    `Please make cheques payable to <strong>Known, LLC</strong> and mail them to ` +
+    `1964 Inglewood Ave SW, New Prague, MN 56071. For ACH or card payment, reply to this ` +
+    `email or call 612-225-8165. Your tickets arrive by email the moment payment lands.`;
+  const payText =
+    `Please make cheques payable to Known, LLC and mail them to 1964 Inglewood Ave SW, ` +
+    `New Prague, MN 56071. For ACH or card payment, reply to this email or call ` +
+    `612-225-8165. Your tickets arrive by email the moment payment lands.`;
+
+  await send({
+    to: t.to,
+    replyTo: 'jer@jeromydarling.com',
+    subject: `Invoice ${t.number} — His Name is Michael, ${t.city}`,
+    html: layout({
+      preheader: `${t.items.join(', ')} at ${t.venue} — ${money(t.total)}, due ${due}.`,
+      heading: `Invoice ${t.number}`,
+      body:
+        `<p style="margin:0 0 6px;">Billed to <strong>${t.org}</strong>` +
+        (t.contact ? `<br>Attn: ${t.contact}` : '') +
+        `</p>` +
+        `<p style="margin:0 0 6px;"><strong>${t.venue}</strong><br>${t.city}</p>` +
+        `<p style="margin:0 0 4px;">${t.when}</p>` +
+        (t.doors ? `<p style="margin:0 0 14px;color:#8b857a;">Doors ${t.doors}</p>` : '') +
+        `<p style="margin:0 0 6px;">${t.items.join(' &middot; ')}</p>` +
+        `<p style="margin:0 0 18px;"><strong>${money(t.total)}</strong> &middot; due ${due}</p>` +
+        (t.note ? `<p style="margin:0 0 18px;color:#8b857a;">${t.note}</p>` : '') +
+        `<p style="margin:0;">${pay}</p>`,
+      footer: `4est Films &middot; Independent Film Production &middot; Est. 2015`,
+    }),
+    text:
+      `Invoice ${t.number}\n\nBilled to ${t.org}${t.contact ? `\nAttn: ${t.contact}` : ''}\n\n` +
+      `${t.venue}\n${t.city}\n${t.when}\n` +
+      (t.doors ? `Doors ${t.doors}\n` : '') +
+      `\n${t.items.join(' · ')}\n${money(t.total)} · due ${due}\n` +
+      (t.note ? `\n${t.note}\n` : '') +
+      `\n${payText}`,
+    campaign: 'boxoffice-invoice',
+  });
+}
+
+/**
  * A free-will offering, once Stripe says the money moved.
  *
  * Recorded against the stop whose QR was scanned (or no stop at all, for a

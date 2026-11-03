@@ -352,14 +352,26 @@ export interface InvoiceLine {
   note: string | null;
   created_at: string;
   seats: number;
+  invoice_number: string | null;
+  org_name: string | null;
+  contact_name: string | null;
+  buyer_address: string | null;
+  issued_on: string | null;
+  due_on: string | null;
+  sent_at: string | null;
+  pay_method: string | null;
 }
+
+const INVOICE_COLS = `o.id, o.buyer_name, o.buyer_email, o.total_cents, o.reserved_admits, o.status,
+              o.reference, o.note, o.created_at,
+              o.invoice_number, o.org_name, o.contact_name, o.buyer_address,
+              o.issued_on, o.due_on, o.sent_at, o.pay_method,
+              (SELECT COUNT(*) FROM bo_tickets t WHERE t.order_id = o.id AND t.void_at IS NULL) AS seats`;
 
 export async function invoicesAt(eventId: number): Promise<InvoiceLine[]> {
   const r = await env.DB
     .prepare(
-      `SELECT o.id, o.buyer_name, o.buyer_email, o.total_cents, o.reserved_admits, o.status,
-              o.reference, o.note, o.created_at,
-              (SELECT COUNT(*) FROM bo_tickets t WHERE t.order_id = o.id AND t.void_at IS NULL) AS seats
+      `SELECT ${INVOICE_COLS}
          FROM bo_orders o WHERE o.event_id = ?1 AND o.channel = 'invoice' ORDER BY o.created_at DESC`
     )
     .bind(eventId)
@@ -392,4 +404,60 @@ export async function sponsorshipsAt(eventId: number): Promise<SponsorshipLine[]
     .bind(eventId)
     .all<SponsorshipLine>();
   return r.results ?? [];
+}
+
+export interface OpenInvoice extends InvoiceLine {
+  slug: string;
+  venue: string;
+  city: string;
+  region: string | null;
+  starts_at: string;
+}
+
+/**
+ * Every group invoice still waiting on money, across the whole tour,
+ * soonest due first. The box office home page reads this: a parish office
+ * that has gone quiet is invisible on its own stop's report until somebody
+ * goes looking, and by then the show is next week.
+ */
+export async function openInvoices(): Promise<OpenInvoice[]> {
+  const r = await env.DB
+    .prepare(
+      `SELECT ${INVOICE_COLS},
+              e.slug, e.venue, e.city, e.region, e.starts_at
+         FROM bo_orders o JOIN bo_events e ON e.id = o.event_id
+        WHERE o.channel = 'invoice' AND o.status = 'unpaid'
+        ORDER BY (o.due_on IS NULL), o.due_on, o.created_at`
+    )
+    .all<OpenInvoice>();
+  return r.results ?? [];
+}
+
+export interface InvoiceItem {
+  name: string;
+  qty: number;
+  unit_price_cents: number;
+}
+
+export interface InvoiceDoc extends InvoiceLine {
+  event_id: number;
+  items: InvoiceItem[];
+}
+
+/** One invoice with its line items: everything the printed document needs. */
+export async function invoiceDoc(orderId: number): Promise<InvoiceDoc | null> {
+  const db = env.DB;
+  const order = await db
+    .prepare(
+      `SELECT ${INVOICE_COLS}, o.event_id
+         FROM bo_orders o WHERE o.id = ?1 AND o.channel = 'invoice'`
+    )
+    .bind(orderId)
+    .first<InvoiceLine & { event_id: number }>();
+  if (!order) return null;
+  const items = await db
+    .prepare(`SELECT name, qty, unit_price_cents FROM bo_order_items WHERE order_id = ?1 ORDER BY id`)
+    .bind(orderId)
+    .all<InvoiceItem>();
+  return { ...order, items: items.results ?? [] };
 }

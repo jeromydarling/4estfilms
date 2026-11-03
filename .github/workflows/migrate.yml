@@ -236,6 +236,31 @@ jobs:
             d1 execute 4estfilms-db --${{ inputs.target }}
             --file migrations/0017_boxoffice_sponsor_orders.sql
 
+      # ALTER-based, like 0014: a re-run fails on the first duplicate column
+      # and the confirm step below is what proves the columns landed.
+      - name: Apply 0018 — invoice details on group orders
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --file migrations/0018_boxoffice_invoice_details.sql
+
+      - name: Confirm 0018 — invoice columns on bo_orders
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: >-
+            d1 execute 4estfilms-db --${{ inputs.target }}
+            --command "SELECT name FROM pragma_table_info('bo_orders')
+            WHERE name IN ('invoice_number', 'org_name', 'contact_name',
+            'buyer_address', 'issued_on', 'due_on', 'sent_at', 'pay_method')"
+
       - name: Confirm schema
         uses: cloudflare/wrangler-action@v3
         with:
