@@ -1,0 +1,36 @@
+name: Box office reminders
+
+# The countdown: buyers are reminded 14, 7, 3 and 1 days before their show,
+# with their ticket codes in the email. The Worker works out who is due and
+# sends; this is only the alarm clock, on the same pattern as the digest.
+# 15:00 UTC is 9am Central in winter and 10am in summer.
+
+on:
+  schedule:
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+
+jobs:
+  reminders:
+    name: Send due reminders
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: Ask the Worker to send them
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          token="$(printf '%s' "$ADMIN_TOKEN" | tr -d '\r\n' | sed 's/^Bearer //')"
+          if [ -z "$token" ]; then echo "ADMIN_TOKEN is empty in the production environment" >&2; exit 1; fi
+          status="$(curl -sS -o /tmp/reminders.json -w '%{http_code}' -X POST \
+            https://4estfilms.studio/api/admin/boxoffice/reminders \
+            -H "authorization: Bearer $token" \
+            -H "content-type: application/json" \
+            -d '{}')"
+          echo "Worker answered $status: $(cat /tmp/reminders.json)"
+          case "$status" in
+            200) ;;
+            404) echo "The Worker refused the token: ADMIN_TOKEN here does not match the Worker's ADMIN_TOKEN secret." >&2; exit 1 ;;
+            *) exit 1 ;;
+          esac
