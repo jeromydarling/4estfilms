@@ -165,6 +165,24 @@ export async function onBoxOffice(s: CheckoutSession): Promise<Response> {
     console.error('BOXOFFICE TICKET EMAIL FAILED', { session: s.id, order: recorded.orderId, err });
   }
 
+  // The team hears about every sale as it lands. Jeromy and Joseph both
+  // want the tap on the shoulder rather than finding sales in a report.
+  try {
+    await notifySale({
+      orderId: recorded.orderId,
+      venue: event.venue,
+      city: `${event.city}${event.region ? `, ${event.region}` : ''}`,
+      when: showTime(event.starts_at),
+      buyerName,
+      buyerEmail,
+      items: priced.lines.map((l) => `${l.qty} × ${l.name}${l.size ? ` (${l.size})` : ''}`),
+      total,
+      channel: s.metadata?.door === '1' ? 'door' : 'web',
+    });
+  } catch (err) {
+    console.error('BOXOFFICE SALE NOTICE FAILED', { session: s.id, order: recorded.orderId, err });
+  }
+
   return new Response('ok', { status: 200 });
 }
 
@@ -291,6 +309,47 @@ export async function sendTickets(t: {
  * Replies land with Jeromy rather than the hello@ sender, because the
  * answer to an invoice is usually a question about money.
  */
+/** The team's copy of a sale: who, what, where, how much. */
+const SALE_NOTICE_TO = ['jer@jeromydarling.com', 'joseph@4estfilms.com'];
+
+export async function notifySale(t: {
+  orderId: number;
+  venue: string;
+  city: string;
+  when: string;
+  buyerName: string | null;
+  buyerEmail: string | null;
+  items: string[];
+  total: number;
+  channel: string;
+}) {
+  const who = t.buyerName || t.buyerEmail || 'A buyer';
+  const contact = t.buyerName && t.buyerEmail ? ` · ${t.buyerEmail}` : '';
+  for (const to of SALE_NOTICE_TO) {
+    await send({
+      to,
+      subject: `Box office sale — ${t.city}: ${money(t.total)}`,
+      html: layout({
+        preheader: `${t.items.join(' · ')} — ${money(t.total)}`,
+        heading: 'A ticket sale just landed.',
+        body:
+          `<p style="margin:0 0 6px;"><strong>${t.venue}</strong><br>${t.city}</p>` +
+          `<p style="margin:0 0 14px;">${t.when}</p>` +
+          `<p style="margin:0 0 4px;">${t.items.join(' &middot; ')} — ${money(t.total)}</p>` +
+          `<p style="margin:0;color:#8b857a;">Buyer: ${who}${contact}<br>` +
+          `Order #${t.orderId} &middot; ${t.channel === 'door' ? 'door sale' : 'online'}</p>`,
+        footer: `4est Films box office`,
+      }),
+      text:
+        `A ticket sale just landed.\n\n${t.venue}\n${t.city}\n${t.when}\n\n` +
+        `${t.items.join(' · ')} — ${money(t.total)}\n` +
+        `Buyer: ${who}${contact}\n` +
+        `Order #${t.orderId} · ${t.channel === 'door' ? 'door sale' : 'online'}`,
+      campaign: 'boxoffice-sale-notice',
+    });
+  }
+}
+
 export async function sendInvoice(t: {
   to: string;
   org: string;
