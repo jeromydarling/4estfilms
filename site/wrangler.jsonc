@@ -11,6 +11,12 @@
 
   "observability": { "enabled": true },
 
+  // Box office go-live switch (lib/boxoffice.ts stripeKey): a live Stripe
+  // key is refused unless this is "true". Set Nov 18, 2026, at Jeromy's
+  // direction, for the Sioux Falls premiere (Jan 25-26, 2027). Remove or
+  // set to "false" to padlock checkout again.
+  "vars": { "BOXOFFICE_LIVE": "true" },
+
   "d1_databases": [
     {
       "binding": "DB",
