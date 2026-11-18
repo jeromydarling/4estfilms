@@ -541,7 +541,7 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
 
 <style>
   .where { margin: 0 0 1.2rem; font-size: 1.05rem; }
-  .poster { display: block; width: 100%; border-radius: 4px; margin: 0 0 1.2rem; }
+  .poster { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 4px; margin: 0 0 1.2rem; }
   .blurb { font-size: 1.05rem; margin: 0 0 1.4rem; }
 
   .facts { margin: 0 0 1.5rem; border-top: 1px solid var(--rule); }
