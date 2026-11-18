@@ -61,6 +61,11 @@ export interface EventRow {
   capacity: number;
   blurb: string | null;
   poster: string | null;
+  /** Street address, box office phone and the venue's own site, for the
+   *  public page's map and contact block. Null until a stop supplies them. */
+  venue_address: string | null;
+  venue_phone: string | null;
+  venue_url: string | null;
   rental_cents: number;
   offering_cents: number;
   leg: string | null;

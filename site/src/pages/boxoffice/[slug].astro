@@ -65,6 +65,41 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
     <div><dt>House</dt><dd>{event.capacity} seats</dd></div>
   </dl>
 
+  {event.venue_address && (
+    <section class="venue">
+      <h2>Getting there</h2>
+      <iframe
+        class="venue__map"
+        title={`Map — ${event.venue}, ${event.venue_address}`}
+        src={`https://www.google.com/maps?q=${encodeURIComponent(`${event.venue}, ${event.venue_address}`)}&output=embed`}
+        loading="lazy"
+      ></iframe>
+      <p class="venue__addr">
+        <strong>{event.venue}</strong><br />
+        {event.venue_address}
+      </p>
+      <p class="venue__links">
+        {event.venue_phone && (
+          <a href={`tel:+1${event.venue_phone.replace(/\D/g, '')}`}>{event.venue_phone}</a>
+        )}
+        {event.venue_url && (
+          <>
+            {' · '}
+            <a href={event.venue_url} target="_blank" rel="noopener">Venue website</a>
+          </>
+        )}
+        {' · '}
+        <a
+          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${event.venue}, ${event.venue_address}`)}`}
+          target="_blank"
+          rel="noopener"
+        >
+          Get directions
+        </a>
+      </p>
+    </section>
+  )}
+
   {!onSale ? (
     <div class={`note ${soldOut ? 'note--bad' : ''}`}>
       {soldOut
@@ -542,6 +577,10 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
 <style>
   .where { margin: 0 0 1.2rem; font-size: 1.05rem; }
   .poster { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 4px; margin: 0 0 1.2rem; }
+  .venue { margin: 0 0 1.6rem; }
+  .venue__map { display: block; width: 100%; height: 320px; border: 0; border-radius: 4px; margin: 0 0 .8rem; }
+  .venue__addr { margin: 0 0 .3rem; }
+  .venue__links { margin: 0; }
   .blurb { font-size: 1.05rem; margin: 0 0 1.4rem; }
 
   .facts { margin: 0 0 1.5rem; border-top: 1px solid var(--rule); }
