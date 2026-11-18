@@ -2,7 +2,7 @@
 import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
 import { listEvents } from '../../../lib/boxoffice-db';
-import { salesByCode } from '../../../lib/boxoffice-report';
+import { partnerPayouts, salesByCode } from '../../../lib/boxoffice-report';
 import { money } from '../../../lib/boxoffice';
 import { env } from 'cloudflare:workers';
 
@@ -10,12 +10,14 @@ export const prerender = false;
 
 if (!(await hasSession(Astro.request))) return Astro.redirect('/admin/');
 
-const [codes, events, rows] = await Promise.all([
+const [codes, events, payoutRows, rows] = await Promise.all([
   salesByCode(),
   listEvents(),
+  partnerPayouts(),
   env.DB.prepare(`SELECT * FROM bo_promo_codes ORDER BY code`).all<Record<string, unknown>>(),
 ]);
 const sales = new Map(codes.map((c) => [c.code, c]));
+const payouts = new Map(payoutRows.map((l) => [l.code, l]));
 const bySlug = new Map(events.map((e) => [e.id, e]));
 ---
 
@@ -23,7 +25,9 @@ const bySlug = new Map(events.map((e) => [e.id, e]));
   <h1>Partner codes</h1>
   <p class="sub">
     One per parish or organisation. The code is how we know who filled the room —
-    a discount is optional and usually nil.
+    a discount is optional and usually nil. Hand the parish its link rather than the
+    bare code where you can: the code rides in the link, already applied, and the
+    parish earns a dollar for every seat sold through it.
   </p>
 
   <form method="post" action="/api/admin/boxoffice/codes" class="new">
@@ -52,11 +56,14 @@ const bySlug = new Map(events.map((e) => [e.id, e]));
       <thead>
         <tr><th>Code</th><th>Partner</th><th>Stop</th><th>Discount</th>
             <th class="right">Used</th><th class="right">Orders</th>
-            <th class="right">Seats</th><th class="right">Gross</th><th></th></tr>
+            <th class="right">Seats</th><th class="right">Gross</th>
+            <th class="right">Owed</th><th class="right">Paid</th><th class="right">Due</th>
+            <th>Link</th><th></th></tr>
       </thead>
       <tbody>
         {(rows.results ?? []).map((c) => {
           const s = sales.get(String(c.code));
+          const pay = payouts.get(String(c.code));
           const ev = c.event_id ? bySlug.get(Number(c.event_id)) : null;
           return (
             <tr class={c.active ? '' : 'off'}>
@@ -69,6 +76,12 @@ const bySlug = new Map(events.map((e) => [e.id, e]));
               <td class="right num">{s?.orders ?? 0}</td>
               <td class="right num">{s?.seats ?? 0}</td>
               <td class="right num">{money(s?.gross_cents ?? 0)}</td>
+              <td class="right num">{money(pay?.owed_cents ?? 0)}</td>
+              <td class="right num">{money(pay?.paid_cents ?? 0)}</td>
+              <td class="right num">{money(pay?.due_cents ?? 0)}</td>
+              <td class="num">{ev
+                ? <a class="lnk" href={`/boxoffice/${ev.slug}/?code=${String(c.code)}`} target="_blank" rel="noopener">/boxoffice/{ev.slug}/?code={String(c.code)}</a>
+                : `any stop + ?code=${String(c.code)}`}</td>
               <td class="right">
                 <form method="post" action="/api/admin/boxoffice/codes">
                   <input type="hidden" name="action" value="toggle" />

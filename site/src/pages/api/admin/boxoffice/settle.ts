@@ -12,7 +12,7 @@ export const prerender = false;
  * the other column.
  */
 const back = (to: string) => new Response(null, { status: 303, headers: { location: to } });
-const KINDS = ['tithe', 'offering', 'rental'];
+const KINDS = ['tithe', 'offering', 'rental', 'partner'];
 
 export const POST: APIRoute = async ({ request, url }) => {
   if (!(await isAdmin(request, url))) return new Response('not found', { status: 404 });
@@ -36,16 +36,19 @@ export const POST: APIRoute = async ({ request, url }) => {
   const amount = toCents(f.get('amount'));
   if (!KINDS.includes(kind) || amount <= 0) return back(`${to}&settled=bad`);
 
+  // A partner payment pays down one code's credit; the code rides along
+  // so the pay list can subtract it from the right parish.
+  const code = String(f.get('code') ?? '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 30) || null;
   const paidAt = String(f.get('paid_at') ?? '').trim();
   const method = String(f.get('method') ?? '').trim().slice(0, 40) || null;
   const note = String(f.get('note') ?? '').trim().slice(0, 300) || null;
 
   await db
     .prepare(
-      `INSERT INTO bo_settlements (event_id, kind, amount_cents, paid_at, method, note)
-       VALUES (?1, ?2, ?3, COALESCE(NULLIF(?4, ''), date('now')), ?5, ?6)`
+      `INSERT INTO bo_settlements (event_id, kind, amount_cents, paid_at, method, note, code)
+       VALUES (?1, ?2, ?3, COALESCE(NULLIF(?4, ''), date('now')), ?5, ?6, ?7)`
     )
-    .bind(event.id, kind, amount, /^\d{4}-\d{2}-\d{2}$/.test(paidAt) ? paidAt : '', method, note)
+    .bind(event.id, kind, amount, /^\d{4}-\d{2}-\d{2}$/.test(paidAt) ? paidAt : '', method, note, kind === 'partner' ? code : null)
     .run();
 
   return back(`${to}&settled=done`);

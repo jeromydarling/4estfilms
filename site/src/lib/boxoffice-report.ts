@@ -204,6 +204,52 @@ export async function salesByCode(eventId?: number): Promise<CodeLine[]> {
   return r.results ?? [];
 }
 
+/** What a partner earns per seat sold through its code: a dollar back. */
+export const PARTNER_CREDIT_CENTS = 100;
+
+export interface PayoutLine {
+  code: string;
+  partner: string;
+  seats: number;
+  owed_cents: number;
+  paid_cents: number;
+  due_cents: number;
+}
+
+/**
+ * The partner pay list: seats sold through each code at a dollar a seat,
+ * less the 'partner' settlements already recorded against that code.
+ * Seats are counted off live tickets, so a refunded seat earns nothing.
+ * With an eventId, one stop's slice — settling up after a show. Without
+ * one, the whole tour: the monthly cheque run.
+ */
+export async function partnerPayouts(eventId?: number): Promise<PayoutLine[]> {
+  const sales = await salesByCode(eventId);
+  const where = eventId ? `AND event_id = ?1` : '';
+  const binds = eventId ? [eventId] : [];
+  const r = await env.DB
+    .prepare(
+      `SELECT code, COALESCE(SUM(amount_cents), 0) AS paid
+         FROM bo_settlements
+        WHERE kind = 'partner' AND code IS NOT NULL ${where}
+        GROUP BY code`
+    )
+    .bind(...binds)
+    .all<{ code: string; paid: number }>();
+  const paid = new Map((r.results ?? []).map((x) => [x.code, Number(x.paid)]));
+  return sales
+    .map((x) => {
+      const owed = x.seats * PARTNER_CREDIT_CENTS;
+      const p = paid.get(x.code) ?? 0;
+      return {
+        code: x.code, partner: x.partner, seats: x.seats,
+        owed_cents: owed, paid_cents: p, due_cents: owed - p,
+      };
+    })
+    .filter((l) => l.seats > 0 || l.paid_cents > 0)
+    .sort((a, b) => b.due_cents - a.due_cents || a.code.localeCompare(b.code));
+}
+
 export interface StockLine {
   sku: string;
   size: string;
@@ -291,13 +337,14 @@ export interface SettlementLine {
   paid_at: string;
   method: string | null;
   note: string | null;
+  code: string | null;
 }
 
 /** What has gone out to this stop's parish and house, newest first. */
 export async function settlementsAt(eventId: number): Promise<SettlementLine[]> {
   const r = await env.DB
     .prepare(
-      `SELECT id, kind, amount_cents, paid_at, method, note
+      `SELECT id, kind, amount_cents, paid_at, method, note, code
          FROM bo_settlements WHERE event_id = ?1 ORDER BY paid_at DESC, id DESC`
     )
     .bind(eventId)

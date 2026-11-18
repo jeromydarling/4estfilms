@@ -179,7 +179,7 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
 
       <h2>Promo code</h2>
       <p class="fine">
-        If a parish or group sent you here, their code tells us they did.
+        If a parish or group sent you here, their code tells us they did. If you came by their link, the code is already in.
       </p>
       <div class="promo">
         <label class="sr" for="promo">Promo code</label>
@@ -433,7 +433,8 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
       refresh();
     });
 
-    form.querySelector('[data-promo]')!.addEventListener('click', async () => {
+    const promoBtn = form.querySelector<HTMLButtonElement>('[data-promo]')!;
+    promoBtn.addEventListener('click', async () => {
       appliedPromo = promoInput.value.trim().toUpperCase();
       promoInput.value = appliedPromo;
       if (!appliedPromo) { promoMsg.textContent = ''; refresh(); return; }
@@ -460,6 +461,17 @@ const tiers = SPONSOR.tiers.filter((t) => !t.partnerOnly || !!event.partner_conf
       }
       refresh();
     });
+
+    // A parish's own link carries its code (?code=STMARYS), so nobody has
+    // to type it: fill the box in and press Apply for the buyer. The same
+    // check runs and the same thank-you shows, and checkout carries the
+    // code exactly as if it had been typed.
+    const linkedCode = new URLSearchParams(location.search).get('code')
+      ?? new URLSearchParams(location.search).get('promo');
+    if (linkedCode) {
+      const clean = linkedCode.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 30);
+      if (clean) { promoInput.value = clean; promoBtn.click(); }
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

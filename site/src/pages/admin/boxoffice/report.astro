@@ -3,7 +3,7 @@ import Admin from '../../../layouts/Admin.astro';
 import { hasSession } from '../../../lib/admin';
 import { getEvent } from '../../../lib/boxoffice-db';
 import {
-  invoicesAt, offeringsAt, salesByCode, settlementsAt, soldBySku, sponsorshipsAt, stopTotals, waitlistAt,
+  invoicesAt, offeringsAt, partnerPayouts, salesByCode, settlementsAt, soldBySku, sponsorshipsAt, stopTotals, waitlistAt,
 } from '../../../lib/boxoffice-report';
 import { SPONSOR, TOUR, money, showTime, sponsorTier } from '../../../lib/boxoffice';
 import { SITE } from '../../../lib/email';
@@ -18,9 +18,10 @@ const event = await getEvent(slug);
 if (!event) return Astro.redirect('/admin/boxoffice/');
 
 const [totals] = await stopTotals(event.id);
-const [items, codes, gifts, invoices, payments, waitlist, sponsorships, orders] = await Promise.all([
+const [items, codes, payouts, gifts, invoices, payments, waitlist, sponsorships, orders] = await Promise.all([
   soldBySku(event.id),
   salesByCode(event.id),
+  partnerPayouts(event.id),
   offeringsAt(event.id),
   invoicesAt(event.id),
   settlementsAt(event.id),
@@ -252,6 +253,43 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
     </table>
   </div>
 
+  <h2>Partner payouts</h2>
+  <p class="muted small">
+    A dollar back for every seat sold through a partner's own link or code, less what has
+    already been paid. Seats are counted off live tickets, so a refunded seat earns nothing.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Code</th><th>Partner</th><th class="right">Seats</th><th class="right">Owed</th><th class="right">Paid</th><th class="right">Still due</th></tr></thead>
+      <tbody>
+        {payouts.length
+          ? payouts.map((l) => (
+              <tr>
+                <td class="num">{l.code}</td>
+                <td>{l.partner}</td>
+                <td class="right num">{l.seats}</td>
+                <td class="right num">{money(l.owed_cents)}</td>
+                <td class="right num">{money(l.paid_cents)}</td>
+                <td class="right num">{money(l.due_cents)}</td>
+              </tr>
+            ))
+          : <tr><td colspan="6" class="empty">No partner has sold a seat at this stop yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+  {payouts.filter((l) => l.due_cents > 0).map((l) => (
+    <form class="row" method="post" action="/api/admin/boxoffice/settle">
+      <input type="hidden" name="slug" value={event.slug} />
+      <input type="hidden" name="kind" value="partner" />
+      <input type="hidden" name="code" value={l.code} />
+      <label><span class="label">Pay {l.partner}</span><input name="amount" inputmode="decimal" value={(l.due_cents / 100).toFixed(2)} required /></label>
+      <label><span class="label">Date</span><input name="paid_at" type="date" /></label>
+      <label><span class="label">How</span><input name="method" placeholder="cheque #1042" /></label>
+      <label class="grow"><span class="label">Note</span><input name="note" /></label>
+      <button type="submit">Record payment</button>
+    </form>
+  ))}
+
   <h2>Sponsor a Family</h2>
   <div class="keys">
     <div class="key">
@@ -310,7 +348,7 @@ const poolUnplaced = totals.sponsored_seats - totals.sponsor_claimed - totals.sp
         {payments.length ? payments.map((p) => (
           <tr>
             <td class="num">{p.paid_at}</td>
-            <td>{p.kind}{p.note ? <span class="muted"> — {p.note}</span> : null}</td>
+            <td>{p.kind}{p.code ? <span class="num"> · {p.code}</span> : null}{p.note ? <span class="muted"> — {p.note}</span> : null}</td>
             <td>{p.method ?? '—'}</td>
             <td class="right num">{money(p.amount_cents)}</td>
             <td class="right">
